@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public class Cell
@@ -19,7 +20,10 @@ public class Cell
     // Optional extensions
     public float Symmetry = 1f;          // Placeholder for future symmetry-based viability
     public Cell[] Neighbors;             // Cached 4-way or 8-way neighbors
+    public bool IsSource = false;
     
+    // public List<Cell> Neighbors = new List<Cell>();
+    public CellVisualiser Visual;
 
     public Cell(Vector2Int position)
     {

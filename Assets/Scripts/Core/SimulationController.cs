@@ -139,7 +139,7 @@ public class SimulationController : MonoBehaviour
                 GameObject visualGO = GameObject.Find($"Cell_{x}_{y}");
                 if (visualGO != null)
                 {
-                    var visual = visualGO.GetComponent<CellVisualizer>();
+                    var visual = visualGO.GetComponent<CellVisualiser>();
 
                     if (cell.IsVacuum)
                     {
@@ -177,7 +177,7 @@ public class SimulationController : MonoBehaviour
         GameObject visualGO = GameObject.Find($"Cell_{position.x}_{position.y}");
         if (visualGO != null)
         {
-            var visual = visualGO.GetComponent<CellVisualizer>();
+            var visual = visualGO.GetComponent<CellVisualiser>();
             visual?.SetColor(Color.red);
         }
         activeCells.Clear();
@@ -222,7 +222,7 @@ public class SimulationController : MonoBehaviour
         GameObject visualGO = GameObject.Find($"Cell_{x}_{y}");
         if (visualGO != null)
         {
-            var visual = visualGO.GetComponent<CellVisualizer>();
+            var visual = visualGO.GetComponent<CellVisualiser>();
             if (cell.IsVacuum)
             {
                 // Vacuum: gray-scale based on entropy  

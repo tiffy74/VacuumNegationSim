@@ -35,7 +35,7 @@ public class SimulationGrid : MonoBehaviour
                 GameObject cellObj = Instantiate(CellPrefab, worldPos, Quaternion.identity, this.transform);
                 cellObj.name = $"Cell_{x}_{y}";
 
-                var visual = cellObj.GetComponent<CellVisualizer>();
+                var visual = cellObj.GetComponent<CellVisualiser>();
                 visual?.Initialize(Color.gray); // initial vacuum color
 
                 // Connect logic to visuals
