@@ -1,4 +1,4 @@
-# Universe Simulator
+# Vacuum Negation Simulator
 
 **A Unity-based simulation of the theoretical framework _Energy as Vacuum Negation_.**  
 This project visualizes how structure, energy, and persistence emerge from an infinite true vacuum — not through design, but through thermodynamic viability conditions.
