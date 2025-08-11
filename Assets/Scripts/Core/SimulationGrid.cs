@@ -38,14 +38,20 @@ public class SimulationGrid : MonoBehaviour
                 var visual = cellObj.GetComponent<CellVisualiser>();
                 visual?.Initialize(Color.gray); // initial vacuum color
 
-                // Connect logic to visuals
+                // Connect logic to visuals + init state
+                var cell = Grid[x, y];
+                cell.GridPosition = new Vector2Int(x, y);
+                cell.IsVacuum = true;
+                cell.Visualiser = visual;
+                cell.BaseEntropy = 0f;     // keep flat for now (we’ll add dynamic later)
+                cell.EntropyDyn = 0f;
 
-                Grid[x, y].GridPosition = new Vector2Int(x, y);
-                Grid[x, y].IsVacuum = true;
+                if ((x == Width / 2 && y == Height / 2) && Time.frameCount == 0)
+                    Debug.Log($"[GRID] Wired visualiser for center at {x},{y}");
             }
         }
-
     }
+
 
     private void AssignNeighbors()
     {

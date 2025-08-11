@@ -1,10 +1,13 @@
 ﻿using System.Collections.Generic;
+using TreeEditor;
 using UnityEngine;
+using static UnityEditor.PlayerSettings;
 
 public class SimulationController : MonoBehaviour
 {
     public SimulationGrid Grid;
     private List<Vector2Int> activeCells = new List<Vector2Int>();
+
     void Start()
     {
         Grid = GetComponent<SimulationGrid>();
@@ -12,8 +15,7 @@ public class SimulationController : MonoBehaviour
         // Inject an initial negation burst in the center
         InjectNegationBurst(new Vector2Int(Grid.Width / 2, Grid.Height / 2));
         // SeedEntropyWells(10); // 10 random high-entropy spots
-        SeedEntropyTerrain(0.12f, 1.0f); // tweak scale for smoothness, amplitude for max entropy
-        InjectNegationBurst(new Vector2Int(Grid.Width / 2, Grid.Height / 2));
+        // SeedEntropyTerrain(0.12f, 1.0f); // tweak scale for smoothness, amplitude for max entropy
     }
 
     void Update()
@@ -21,102 +23,73 @@ public class SimulationController : MonoBehaviour
         TickSimulation();
     }
 
-    //void TickSimulation()
-    //{
-    //    PropagateActiveCells();
-    //    UpdateEntropyAndColors();
-    //}
-
-    void PropagateActiveCells()
-    {
-        List<Vector2Int> nextActive = new List<Vector2Int>();
-
-        foreach (var pos in activeCells)
-        {
-            Cell cell = Grid.GetCell(pos);
-            if (cell == null || cell.IsVacuum || cell.Viability <= 1f)
-                continue;
-
-            foreach (Cell neighbor in cell.Neighbors)
-            {
-                if (neighbor == null || !neighbor.IsVacuum)
-                    continue;
-
-                float propagatedEnergy = cell.Energy * 0.95f;
-                float entropyPenalty = neighbor.Entropy;
-                float propagatedViability = (propagatedEnergy - entropyPenalty * 0.25f) / 1.0f;
-
-                if (propagatedViability > 1f)
-                {
-                    neighbor.IsVacuum = false;
-                    neighbor.Energy = propagatedEnergy;
-                    neighbor.Viability = propagatedViability;
-                    nextActive.Add(neighbor.GridPosition);
-                }
-            }
-
-            cell.Energy *= 0.995f;
-            cell.Viability = cell.Energy / 1.0f;
-        }
-
-        activeCells = nextActive;
-    }
-    void UpdateEntropyAndColors()
-    {
-        for (int x = 0; x < Grid.Width; x++)
-        {
-            for (int y = 0; y < Grid.Height; y++)
-            {
-                var cell = Grid.Grid[x, y];
-                if (cell == null) continue;
-
-                // Passive entropy growth
-                cell.Entropy += 0.0005f;
-                if (cell.Entropy > 1f)
-                    cell.Entropy = 1f;
-
-                object updatedVisual = UpdateCellVisual(cell, x, y);
-            }
-        }
-    }
     void TickSimulation()
     {
         List<Vector2Int> nextActiveCells = new List<Vector2Int>();
-
         foreach (var pos in activeCells)
         {
             Cell cell = Grid.GetCell(pos);
-            if (cell == null || cell.IsVacuum || cell.Viability <= 1f)
+            if (cell == null || cell.IsVacuum)
                 continue;
+            cell.Viability = ComputeViability(cell);
+            if (cell.Viability <= 0.01f)
+                continue;
+
+            // Find the most attractive neighbor(s)
+            float maxAttractiveness = float.MinValue;
+            Cell mostAttractiveNeighbor = null;
+            float energyWeight = 1f; // Tune this value
 
             foreach (Cell neighbor in cell.Neighbors)
             {
                 if (neighbor == null || !neighbor.IsVacuum)
                     continue;
 
-                float propagatedEnergy = cell.Energy * 0.95f;
-                float entropyPenalty = neighbor.Entropy;
-                float propagatedViability = (propagatedEnergy - entropyPenalty * 0.25f) / 1.0f;
-
-                if (propagatedViability > 1f)
+                float attractiveness = neighbor.Entropy - neighbor.Energy * energyWeight;
+                if (attractiveness > maxAttractiveness)
                 {
-                    neighbor.IsVacuum = false;
-                    neighbor.Energy = propagatedEnergy;
-                    neighbor.Viability = propagatedViability;
-
-                    // Add to queue for next tick
-                    nextActiveCells.Add(neighbor.GridPosition);
-
-                    GameObject visualGO = GameObject.Find($"Cell_{neighbor.GridPosition.x}_{neighbor.GridPosition.y}");
-                    
+                    maxAttractiveness = attractiveness;
+                    mostAttractiveNeighbor = neighbor;
                 }
+            }
+
+            // Only propagate to the most attractive neighbor (or you can propagate to all above a threshold)
+            if (mostAttractiveNeighbor != null)
+            {
+                float propagatedEnergy = cell.Energy * 0.95f;
+                mostAttractiveNeighbor.IsVacuum = false;
+                mostAttractiveNeighbor.Energy = propagatedEnergy;
+                mostAttractiveNeighbor.Viability = ComputeViability(mostAttractiveNeighbor);
+
+                // Dynamic entropy growth as before
+                float entropyIncrease = Mathf.PerlinNoise(
+                    mostAttractiveNeighbor.GridPosition.x * 0.1f,
+                    mostAttractiveNeighbor.GridPosition.y * 0.1f
+                ) * 0.2f;
+                mostAttractiveNeighbor.Entropy += entropyIncrease;
+                mostAttractiveNeighbor.Entropy = Mathf.Clamp01(mostAttractiveNeighbor.Entropy);
+
+                // Visual update (optional)
+                var vgo = GameObject.Find($"Cell_{mostAttractiveNeighbor.GridPosition.x}_{mostAttractiveNeighbor.GridPosition.y}");
+                if (vgo != null)
+                {
+                    var v = vgo.GetComponent<CellVisualiser>();
+                    v?.SetViabilityWithEntropy(ComputeViability(mostAttractiveNeighbor), mostAttractiveNeighbor.Entropy);
+                }
+
+                nextActiveCells.Add(mostAttractiveNeighbor.GridPosition);
             }
 
             // Decay energy of source cell
             cell.Energy *= 0.995f;
-            cell.Viability = cell.Energy / 1.0f;
+            cell.Viability = ComputeViability(cell);
             cell.Entropy += 0.0002f;
-            Debug.Log($"cell.Energy = {cell.Energy}, cell.Viability = {cell.Viability}");
+            if (cell.Viability > 0.1f)
+            {
+                CellVisualiser visual = cell.Visualiser;
+                visual.SetViabilityWithEntropy(ComputeViability(cell), cell.Entropy);
+                nextActiveCells.Add(cell.GridPosition);
+            }
         }
 
         // Update queue
@@ -132,7 +105,7 @@ public class SimulationController : MonoBehaviour
                 var cell = Grid.Grid[x, y];
                 if (cell == null) continue;
 
-                cell.Entropy += 0.002f;
+                cell.Entropy += 0.01f;
                 if (cell.Entropy > 1f)
                     cell.Entropy = 1f;
 
@@ -143,20 +116,13 @@ public class SimulationController : MonoBehaviour
 
                     if (cell.IsVacuum)
                     {
-                        // Vacuum: gray-scale based on entropy
                         float brightness = Mathf.Lerp(0.2f, 0.7f, 1 - cell.Entropy);
                         visual.SetColor(new Color(brightness, brightness, brightness));
                     }
                     else
                     {
-                        // 1. First get the viability-based color
-                        Color viabilityColor = visual.GetViabilityColor(cell.Viability); // NEW METHOD
+                        visual.SetCombinedColor(visual.GetViabilityColor(ComputeViability(cell)), cell.Entropy);
 
-                        // 2. Fade that color toward gray based on entropy
-                        float entropyFade = Mathf.Clamp01(cell.Entropy);
-                        Color finalColor = Color.Lerp(viabilityColor, Color.gray, entropyFade);
-
-                        visual.SetColor(finalColor);
                     }
                 }
 
@@ -170,8 +136,8 @@ public class SimulationController : MonoBehaviour
         if (cell == null) return;
 
         cell.IsVacuum = false;
-        cell.Energy = 500.0f; // Strong burst to ensure propagation
-        cell.Viability = 500.0f;
+        cell.Energy = 50.0f; // Strong burst to ensure propagation
+        cell.Viability = ComputeViability(cell);
         cell.IsNegationSource = true;
 
         GameObject visualGO = GameObject.Find($"Cell_{position.x}_{position.y}");
@@ -185,63 +151,21 @@ public class SimulationController : MonoBehaviour
         Debug.Log($"Negation burst injected at {position.x}, {position.y}");
     }
 
-    void SeedEntropyWells(int count)
+    private float ComputeViability(Cell c)
     {
-        for (int i = 0; i < count; i++)
-        {
-            int x = Random.Range(5, Grid.Width - 5);
-            int y = Random.Range(5, Grid.Height - 5);
-            Cell cell = Grid.Grid[x, y];
-            if (cell != null)
-            {
-                cell.Entropy = 1.0f;
-                Debug.Log($"Entropy well seeded at {x}, {y}");
-            }
-        }
-    }
+        // Basic viability: higher energy & lower entropy = higher viability
+        float entropy = c.TotalEntropy; // we just added this property
+        float threshold = 50f; // arbitrary test threshold for now
 
-    void SeedEntropyTerrain(float scale = 0.1f, float amplitude = 1.0f)
-    {
-        for (int x = 0; x < Grid.Width; x++)
+        float raw = (c.Energy - entropy * threshold) / threshold;
+        float v = Mathf.Clamp01(raw);
+
+        // Debug log for center cell every 30 frames
+        if (c.GridPosition.x == Grid.Width / 2 && c.GridPosition.y == Grid.Height / 2 && Time.frameCount % 30 == 0)
         {
-            for (int y = 0; y < Grid.Height; y++)
-            {
-                float noise = Mathf.PerlinNoise(x * scale, y * scale); // smooth noise
-                Cell cell = Grid.Grid[x, y];
-                if (cell != null)
-                    cell.Entropy = noise * amplitude;
-            }
+            Debug.Log($"[VIABILITY] Center -> E={c.Energy:F2}, Entropy={entropy:F3}, V={v:F3}");
         }
 
-        Debug.Log("Entropy terrain seeded using Perlin noise.");
-    }
-
-    // Add the missing UpdateCellVisual method to resolve the CS0103 error.  
-    private object UpdateCellVisual(Cell cell, int x, int y)
-    {
-        GameObject visualGO = GameObject.Find($"Cell_{x}_{y}");
-        if (visualGO != null)
-        {
-            var visual = visualGO.GetComponent<CellVisualiser>();
-            if (cell.IsVacuum)
-            {
-                // Vacuum: gray-scale based on entropy  
-                float brightness = Mathf.Lerp(0.2f, 0.7f, 1 - cell.Entropy);
-                visual.SetColor(new Color(brightness, brightness, brightness));
-            }
-            else
-            {
-                // 1. First get the viability-based color  
-                Color viabilityColor = visual.GetViabilityColor(cell.Viability);
-
-                // 2. Fade that color toward gray based on entropy  
-                float entropyFade = Mathf.Clamp01(cell.Entropy);
-                Color finalColor = Color.Lerp(viabilityColor, Color.gray, entropyFade);
-
-                visual.SetColor(finalColor);
-            }
-        }
-
-        return visualGO;
+        return v;
     }
 }

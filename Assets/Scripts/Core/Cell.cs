@@ -25,6 +25,16 @@ public class Cell
     // public List<Cell> Neighbors = new List<Cell>();
     public CellVisualiser Visual;
 
+    public float BaseEntropy = 0f; // seeded once (e.g., Perlin or 0)
+    public float EntropyDyn = 0f; // evolves each tick
+
+    public CellVisualiser Visualiser;   // link to the sprite renderer helper
+
+
+    public float TotalEntropy
+    {
+        get { return Mathf.Clamp01(BaseEntropy + EntropyDyn); }
+    }
     public Cell(Vector2Int position)
     {
         GridPosition = position;
