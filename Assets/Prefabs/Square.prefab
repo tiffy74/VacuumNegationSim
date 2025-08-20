@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 3711475515143719530}
   - component: {fileID: 893174691382403772}
   - component: {fileID: 8606686667192218546}
-  - component: {fileID: 3903289855371644177}
+  - component: {fileID: 5334332967901372965}
   m_Layer: 0
   m_Name: Square
   m_TagString: Untagged
@@ -78,12 +78,12 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
-  m_Sprite: {fileID: 7482667652216324306, guid: dcf8d83ece7e3ca43930d1e2c23c64ec, type: 3}
+  m_Sprite: {fileID: 6750033715232265413, guid: d16c3c25dc5f3534880fa73a79f3cc42, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
-  m_Size: {x: 1, y: 1}
+  m_Size: {x: 2.56, y: 2.56}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
@@ -127,15 +127,15 @@ BoxCollider2D:
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.5}
-    oldSize: {x: 1, y: 1}
-    newSize: {x: 1, y: 1}
+    oldSize: {x: 2.56, y: 2.56}
+    newSize: {x: 2.56, y: 2.56}
     adaptiveTilingThreshold: 0.5
     drawMode: 0
     adaptiveTiling: 0
   m_AutoTiling: 0
   m_Size: {x: 1, y: 1}
   m_EdgeRadius: 0
---- !u!114 &3903289855371644177
+--- !u!114 &5334332967901372965
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}

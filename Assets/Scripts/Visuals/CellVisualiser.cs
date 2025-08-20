@@ -20,17 +20,13 @@ public class CellVisualiser : MonoBehaviour
         Debug.Log($"[VISUAL] Initialized CellVisualiser with color {color}");
     }
 
-    public void SetColor(Color color)
-    {
-        if (_renderer != null)
-            _renderer.color = color;
-    }
+    
     public Color GetViabilityColor(float viability)
     {
         float t = Mathf.Clamp01(viability);
 
         if (t < 0.1f)
-            return Color.Lerp(new Color(0.2f, 0.2f, 0.5f), Color.blue, t / 0.1f); // deep blue to blue
+            return Color.Lerp(Color.black, Color.red, t / 0.1f); // deep blue to blue
         else if (t < 0.2f)
             return Color.Lerp(Color.blue, Color.cyan, (t - 0.1f) / 0.1f);
         else if (t < 0.4f)
@@ -42,14 +38,14 @@ public class CellVisualiser : MonoBehaviour
         else if (t < 0.95f)
             return Color.Lerp(new Color(1.0f, 0.5f, 0.0f), Color.red, (t - 0.8f) / 0.15f); // orange to red
         else
-            return Color.Lerp(Color.red, Color.black, (t - 0.95f) / 0.05f); // red to white for very high viability
+            return Color.Lerp(Color.whiteSmoke, Color.white, (t - 0.99f) / 0.05f); // red to white for very high viability
     }
     public void SetViabilityColor(float viability)
     {
         if (_renderer == null)
             _renderer = GetComponent<SpriteRenderer>();
 
-        Color color = Color.black; // Default color
+        Color color = Color.grey; // Default color
 
         float t = Mathf.Clamp01(viability);
         if (t < 0.002f)
@@ -91,5 +87,13 @@ public class CellVisualiser : MonoBehaviour
 
         entropyColor.a = 1f;
         _renderer.color = entropyColor;
+    }
+    // Add near the bottom of CellVisualiser.cs
+    public void SetColor(Color c)
+    {
+        // If you already cache SpriteRenderer as _sr, use that.
+        // Otherwise:
+        var sr = GetComponent<SpriteRenderer>();
+        sr.color = c;
     }
 }
