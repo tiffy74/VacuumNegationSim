@@ -21,7 +21,7 @@ public class Cell
     public float Symmetry = 1f;          // Placeholder for future symmetry-based viability
     public Cell[] Neighbors;             // Cached 4-way or 8-way neighbors
     public bool IsSource = false;
-    
+
     // public List<Cell> Neighbors = new List<Cell>();
     public CellVisualiser Visual;
 

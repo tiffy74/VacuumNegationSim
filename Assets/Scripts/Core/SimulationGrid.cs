@@ -36,7 +36,7 @@ public class SimulationGrid : MonoBehaviour
                 cellGO.name = $"Cell_{x}_{y}";
                 var visualiser = cellGO.GetComponent<CellVisualiser>();
                 views[x, y] = visualiser;
-                visualiser.Initialize(Color.red); // or any default color
+                visualiser.Initialize(Color.black); // or any default color
             }
         }
     }
