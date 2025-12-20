@@ -9,7 +9,7 @@ public class SimulationUIController : MonoBehaviour
     public GameObject OverlayPanel;
     public TMP_InputField NGlobalMaxInput;
     public TMP_InputField NGlobalInput;
-    
+
     // public TMP_InputField GlobalReplenishPerTickInput;
     public TMP_InputField MinEnergyForPersistenceInput;
 
@@ -24,7 +24,7 @@ public class SimulationUIController : MonoBehaviour
 
     public TMP_InputField EntropyGainPerUseInput;
     public TMP_InputField EntropyDiffuseRateInput;
-    
+
     public TMP_InputField EntropyDecayInput;
 
     public TMP_InputField NlocalMaxInput;
@@ -67,7 +67,8 @@ public class SimulationUIController : MonoBehaviour
         // Play Button
         PlayButton.onClick.AddListener(() => simController.Play());
 
-        RestartButton.onClick.AddListener(RestartAndResume);
+        // Fix: Use lambda to call RestartAndResume, which is defined in Update (should be moved to class scope)
+        RestartButton.onClick.AddListener(() => RestartAndResume());
 
         // Pause Button
         PauseButton.onClick.AddListener(() => simController.Pause());
@@ -77,120 +78,63 @@ public class SimulationUIController : MonoBehaviour
 
         PanelButton.onClick.AddListener(TogglePanel);
         OverlayPanel.SetActive(true);
-
-        //// **************************************************************************
-        //// Global
-        //Debug.Log($"NGlobalMax: {simController.NGlobalMax}");
-        //NGlobalMaxInput.text = simController.NGlobalMax.ToString("G");
-        //Debug.Log($"NGlobal: {simController.NGlobal}");
-        //NGlobalInput.text = simController.NGlobal.ToString("G"); ;
-        ////GlobalReplenishPerTickInput.text = simController.GlobalReplenishPerTick.ToString("G");
-        //MinEnergyForPersistenceInput.text = simController.MinEnergyForPersistence.ToString("G");
-
-        //AddFloatInputListener(NGlobalMaxInput, v => simController.NGlobalMax = v);
-        //AddFloatInputListener(NGlobalInput, v => simController.NGlobal = v);
-        ////AddFloatInputListener(GlobalReplenishPerTickInput, v => simController.GlobalReplenishPerTick = v);
-        //AddFloatInputListener(MinEnergyForPersistenceInput, v => simController.MinEnergyForPersistence = v);
-
-        //// **************************************************************************
-        //// Viability / Threshold
-        //EthreshBaseInput.text = simController.EthreshBase.ToString("G");
-        //GlobalScarcityKInput.text = simController.GlobalScarcityK.ToString("G");
-        //EntropyPenaltyInput.text = simController.EntropyPenalty.ToString("G");
-        //DecayLossInput.text = simController.DecayLoss.ToString("G");
-
-        //// Listeners
-        //AddFloatInputListener(EthreshBaseInput, v => simController.EthreshBase = v);
-        //AddFloatInputListener(GlobalScarcityKInput, v => simController.GlobalScarcityK = v);
-        //AddFloatInputListener(EntropyPenaltyInput, v => simController.EntropyPenalty = v);
-        //AddFloatInputListener(DecayLossInput, v => simController.DecayLoss = v);
-
-        //// **************************************************************************
-        //// Propagation
-        //PropagateFracInput.text = simController.PropagateFrac.ToString("G");
-        //MinBudgetToPropagateInput.text = simController.MinBudgetToPropagate.ToString("G");
-        //ActivationCostInput.text = simController.ActivationCost.ToString("G");
-
-        //// Listeners
-        //AddFloatInputListener(PropagateFracInput, v => simController.PropagateFrac = v);
-        //AddFloatInputListener(MinBudgetToPropagateInput, v => simController.MinBudgetToPropagate = v);
-        //AddFloatInputListener(ActivationCostInput, v => simController.ActivationCost = v);
-
-        //// **************************************************************************
-        //// Entropy Dynamics
-        //EntropyGainPerUseInput.text = simController.EntropyGainPerUse.ToString("G");
-        //EntropyDiffuseRateInput.text = simController.EntropyDiffuseRate.ToString("G");
-        //EntropyDecayInput.text = simController.EntropyDecay.ToString("G");
-
-        //// Listeners
-        //AddFloatInputListener(EntropyGainPerUseInput, v => simController.EntropyGainPerUse = v);
-        //AddFloatInputListener(EntropyDiffuseRateInput, v => simController.EntropyDiffuseRate = v);
-        //AddFloatInputListener(EntropyDecayInput, v => simController.EntropyDecay = v);
-
-
-        //// **************************************************************************
-        //// ***** Local Limits
-        //NlocalMaxInput.text = simController.NlocalMax.ToString("G");
-        //VacuumEventProbabilityInput.text = simController.VacuumEventProbability.ToString("G");
-        //VacuumEventEntropyInput.text = simController.VacuumEventEntropy.ToString("G");
-        //// Listeners
-        //AddFloatInputListener(NlocalMaxInput, v => simController.NlocalMax = v);
-        //AddFloatInputListener(VacuumEventProbabilityInput, v => simController.VacuumEventProbability = v);
-        //AddFloatInputListener(VacuumEventProbabilityInput, v => simController.VacuumEventProbability = v);
-
-        //// **************************************************************************
-    }
-    void Update()
-    {
-        if (OverlayPanel.activeSelf)
-        {
-            int cellCount = simController.Grid.Width * simController.Grid.Height;
-            int viableCount = 0;
-            int activeCount = 0;
-            double totalEnergy = 0;
-            double totalEntropy = 0;
-
-            for (int i = 0; i < simController.Nlocal.Length; i++)
-            {
-                if (simController.Nlocal[i] > simController.MinEnergyForPersistence)
-                    viableCount++;
-                if (simController.Active[i] == 1)
-                    activeCount++;
-                totalEnergy += simController.Nlocal[i];
-                totalEntropy += simController.Entropy[i];
-            }
-
-            double avgEnergy = totalEnergy / cellCount;
-            double avgEntropy = totalEntropy / cellCount;
-
-            CellCountText.text = $"Total Cells: {cellCount}";
-            ViableCellCountText.text = $"Viable Cells: {viableCount}";
-            ActiveCellCountText.text = $"Active Cells: {activeCount}";
-            AvgEnergyText.text = $"Avg Energy: {avgEnergy:F2}";
-            AvgEntropyText.text = $"Avg Entropy: {avgEntropy:F2}";
-            NGlobalText.text = $"Global Energy: {simController.NGlobal:E2}";
-            TickText.text = $"Tick: {simController.tick}";
-        }
     }
 
+    // Move these methods to class scope so they are accessible
     void TogglePanel()
     {
         OverlayPanel.SetActive(!OverlayPanel.activeSelf);
     }
+
     void RestartAndResume()
     {
         simController.RestartSimulation();
         simController.Play(); // Immediately resume simulation after restart
     }
-    public void ExitApplication()
+
+    void ExitApplication()
     {
         Debug.Log("Exiting application...");
-        #if UNITY_EDITOR
-                // Stop play mode in the Unity Editor
-                UnityEditor.EditorApplication.isPlaying = false;
-        #else
-            // Quit the application in standalone builds
-            Application.Quit();
-        #endif
+#if UNITY_EDITOR
+        // Stop play mode in the Unity Editor
+        UnityEditor.EditorApplication.isPlaying = false;
+#else
+        // Quit the application in standalone builds
+        Application.Quit();
+#endif
+    }
+
+    void Update()
+    {
+        //    if (OverlayPanel.activeSelf)
+        //    {
+        //        int cellCount = simController.Grid.Width * simController.Grid.Height;
+        //        int viableCount = 0;
+        //        int activeCount = 0;
+        //        double totalEnergy = 0;
+        //        double totalEntropy = 0;
+
+        //        for (int i = 0; i < simController.Nlocal.Length; i++)
+        //        {
+        //            if (simController.Nlocal[i] > simController.MinEnergyForPersistence)
+        //                viableCount++;
+        //            if (simController.Active[i] == 1)
+        //                activeCount++;
+        //            totalEnergy += simController.Nlocal[i];
+        //            totalEntropy += simController.Entropy[i];
+        //        }
+
+        //        double avgEnergy = totalEnergy / cellCount;
+        //        double avgEntropy = totalEntropy / cellCount;
+
+        //        CellCountText.text = $"Total Cells: {cellCount}";
+        //        ViableCellCountText.text = $"Viable Cells: {viableCount}";
+        //        ActiveCellCountText.text = $"Active Cells: {activeCount}";
+        //        AvgEnergyText.text = $"Avg Energy: {avgEnergy:F2}";
+        //        AvgEntropyText.text = $"Avg Entropy: {avgEntropy:F2}";
+        //        NGlobalText.text = $"Global Energy: {simController.NGlobal:E2}";
+        //        TickText.text = $"Tick: {simController.tick}";
+        //    }
+        //}
     }
 }

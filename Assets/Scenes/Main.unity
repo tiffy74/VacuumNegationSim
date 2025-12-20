@@ -2023,14 +2023,12 @@ MonoBehaviour:
   ScaleFactor: 1
   SpatialThreshK: -0.6
   SpatialDecayK: 0.5
-  Nlocal: []
-  Entropy: []
-  V: []
-  Active: 
+  ticksPerSecond: 5
   rNorm: []
+  FieldFirstTick: 
+  EnergyFirstTick: 
   tick: 0
   Grid: {fileID: 0}
-  ticksPerSecond: 5
 --- !u!114 &1095549188
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3796,6 +3794,26 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 10306, guid: 0000000000000000f000000000000000, type: 0}
+    - target: {fileID: 6764447669470730240, guid: f7a26da698ee92b4498f6ab6abcf47fb, type: 3}
+      propertyPath: m_SpriteTilingProperty.pivot.x
+      value: 0.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 6764447669470730240, guid: f7a26da698ee92b4498f6ab6abcf47fb, type: 3}
+      propertyPath: m_SpriteTilingProperty.pivot.y
+      value: 0.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 6764447669470730240, guid: f7a26da698ee92b4498f6ab6abcf47fb, type: 3}
+      propertyPath: m_SpriteTilingProperty.oldSize.x
+      value: 2.56
+      objectReference: {fileID: 0}
+    - target: {fileID: 6764447669470730240, guid: f7a26da698ee92b4498f6ab6abcf47fb, type: 3}
+      propertyPath: m_SpriteTilingProperty.oldSize.y
+      value: 2.56
+      objectReference: {fileID: 0}
+    - target: {fileID: 6764447669470730240, guid: f7a26da698ee92b4498f6ab6abcf47fb, type: 3}
+      propertyPath: m_SpriteTilingProperty.adaptiveTiling
+      value: 1
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

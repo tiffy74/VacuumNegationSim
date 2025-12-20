@@ -16,7 +16,7 @@ namespace Assets.Scripts.Events
             float MinBudgetToPropagate, float PropagateFrac,
             bool[] FieldPresent, bool[] IsBlackHole, float[] BlackHoleCharge, float blackHoleThreshold, float MatterAheadThreshold,
             int[] FieldFirstTick, int[] EnergyFirstTick )
-        {
+            {
             System.Array.Clear(incoming, 0, incoming.Length);
 
             int Idx(int x, int y) => y * width + x;
@@ -40,6 +40,9 @@ namespace Assets.Scripts.Events
                     float available = Nlocal[i] * PropagateFrac;
                     if (available <= 0f) continue;
 
+                    // CONSERVE: remove from source
+                    Nlocal[i] = Mathf.Max(0f, Nlocal[i] - available);
+
                     float portion = available * 0.25f; // 4-neighbour split
 
                     for (int d = 0; d < 4; d++)
@@ -61,24 +64,53 @@ namespace Assets.Scripts.Events
                                  IsFieldBoundary(neighborIdx, FieldPresent, width, height, Idx))
                         {
                             BlackHoleCharge[neighborIdx] += portion;
-                            Debug.Log($"BH charge at {neighborIdx % width},{neighborIdx / width}: " +
-                                      $"Nlocal={Nlocal[neighborIdx]}, charge={BlackHoleCharge[neighborIdx]}");
 
                             if (BlackHoleCharge[neighborIdx] > blackHoleThreshold)
                             {
                                 IsBlackHole[neighborIdx] = true;
                                 BlackHoleCharge[neighborIdx] = 0f;
-                                Debug.Log($"Black hole formed at ({neighborIdx % width},{neighborIdx / width})");
                             }
                         }
                     }
 
                     //if (portion > 0f)
+                    //{
                     //    Debug.Log($"Cell ({x},{y}) outflow portion={portion} to neighbors");
+                    //}
+                        
                 }
             }
         }
+        public static void GatherInflow(int width, int height, Func<int, int, int> Idx,
+            float[] Nlocal, int[] FieldFirstTick, int[] EnergyFirstTick,
+            bool[] FieldPresent, byte[] Active, float[] incoming, int tick)
+        {
+            // Add inflow to all seeded cells  
+            int cx = width / 2, cy = height / 2;
+            for (int dy = -2; dy <= 2; dy++)
+            {
+                for (int dx = -2; dx <= 2; dx++)
+                {
+                    int x = cx + dx;
+                    int y = cy + dy;
+                    if (x >= 0 && x < width && y >= 0 && y < height)
+                    {
+                        int i = Idx(x, y);
 
+                        float pulse = 0.1f * Mathf.Exp(-tick / 80f);
+                        // continuous inflow to the central patch
+                        incoming[i] += pulse;
+
+                        // ensure these stay as seeded/field cells (optional but consistent)
+                        if (tick < 5) incoming[i] += 0.1f;
+                        Active[i] = 1;
+                        FieldPresent[i] = true;
+                        if (FieldFirstTick[i] == -1) FieldFirstTick[i] = tick;
+                        if (EnergyFirstTick[i] == -1) EnergyFirstTick[i] = tick;
+                    }
+                }
+            }
+        }
         private static bool IsFieldBoundary(int idx, bool[] FieldPresent, int width, int height, Func<int, int, int> Idx)
         {
             int x = idx % width;

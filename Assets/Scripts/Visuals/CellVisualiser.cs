@@ -3,7 +3,7 @@ using UnityEngine;
 public class CellVisualiser : MonoBehaviour
 {
     private SpriteRenderer _renderer;
-
+    public Color LastColor { get; private set; }
     void Awake()
     {
         _renderer = GetComponent<SpriteRenderer>();
@@ -76,39 +76,41 @@ public class CellVisualiser : MonoBehaviour
             1f
         );
     }
-    public void SetViabilityWithEntropy(float viability, float entropy, float rNorm)
+    public void SetViabilityWithEntropy(float viability, float entropy)
     {
-        float vNorm = NormalizeViability(viability);
+        float vNorm = Mathf.Clamp01(viability);
         float eNorm = Mathf.Clamp01(entropy);
 
         Color viabilityColor = GetViabilityColor(vNorm);
 
+        // Entropy as a subtle overlay, not a full override
         float entropyBlend = Mathf.Pow(eNorm, 1.2f) * 0.4f;
-        Color entropyOverlay = Color.Lerp(viabilityColor, Color.black, entropyBlend);
 
+        // Only fade to black if viability is extremely low
         if (vNorm < 0.05f)
-            entropyOverlay = Color.Lerp(entropyOverlay, Color.black, 1f - vNorm / 0.05f);
+        {
+            Color entropyOverlay = Color.Lerp(viabilityColor, Color.blue, entropyBlend);
+            viabilityColor = entropyOverlay;
+        }
+            
 
-        Color finalColor = Color.Lerp(viabilityColor, entropyOverlay, 0.5f);
-        finalColor = ApplyRadialShading(finalColor, rNorm);
-
-        _renderer.color = finalColor;
+        SetCombinedColor(viabilityColor);
     }
 
 
-    public void SetCombinedColor(Color viabilityColor, Color entropyOverlay)
+    public void SetCombinedColor(Color viabilityColor)
     {
         if (_renderer == null)
             _renderer = GetComponent<SpriteRenderer>();
 
         // Blend the two colors (you can adjust the blend factor as needed)
-        Color finalColor = Color.Lerp(viabilityColor, entropyOverlay, 0.5f);
+        Color finalColor = viabilityColor;
         finalColor.a = 1f;
         _renderer.color = finalColor;
     }
     // Add near the bottom of CellVisualiser.cs
     public void SetColor(Color c)
-    {
+    { 
         // If you already cache SpriteRenderer as _sr, use that.
         // Otherwise:
         var sr = GetComponent<SpriteRenderer>();
