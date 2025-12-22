@@ -14,7 +14,6 @@ namespace Assets.Scripts.Domain
         public byte[] Active;
         public bool[] IsVacuum, FieldPresent, IsBlackHole;
         public int[] ZeroEnergyTicks, FieldFirstTick, EnergyFirstTick;
-
         public GridState(int w, int h)
         {
             W = w; H = h; Len = w * h;
@@ -36,6 +35,7 @@ namespace Assets.Scripts.Domain
             ZeroEnergyTicks = new int[Len];
             FieldFirstTick = new int[Len];
             EnergyFirstTick = new int[Len];
+
         }
 
         public int Idx(int x, int y) => y * W + x;

@@ -9,6 +9,7 @@ namespace Assets.Scripts.Events
 {
     public static class BlackHoles
     {
+        public static float LastDrained { get; private set; }
         private static readonly int[] dx = { 0, 0, -1, 1 };
         private static readonly int[] dy = { -1, 1, 0, 0 };
 
@@ -61,10 +62,12 @@ namespace Assets.Scripts.Events
         /// Drains a fraction of neighbouring cell energy into black-hole cells.
         /// This is a direct state-driven port of your SimulationController.BlackHoleAttractEnergy().
         /// </summary>
-        public static void BlackHoleAttractEnergy(GridState s, float absorbFracPerTick = 0.2f)
+        public static float BlackHoleAttractEnergy(GridState s, float absorbFracPerTick = 0.2f, bool fieldOnly = true)
         {
             // Clamp absorb fraction to a safe range
             absorbFracPerTick = UnityEngine.Mathf.Clamp01(absorbFracPerTick);
+
+            float drainedTotal = 0f;
 
             for (int y = 0; y < s.H; y++)
             {
@@ -84,6 +87,7 @@ namespace Assets.Scripts.Events
 
                         // Only drain from non-black-hole neighbours
                         if (s.IsBlackHole[ni]) continue;
+                        if (fieldOnly && !s.FieldPresent[ni]) continue;
 
                         float neighbourEnergy = s.Nlocal[ni];
                         if (neighbourEnergy <= 0f) continue;
@@ -92,15 +96,13 @@ namespace Assets.Scripts.Events
 
                         // Remove from neighbour
                         s.Nlocal[ni] = neighbourEnergy - absorbed;
-
-                        // Option A: Let absorbed energy vanish (matches your current behaviour)
-                        // (do nothing)
-
-                        // Option B (optional): Accumulate into BH charge so it has "mass"
-                        // s.BlackHoleCharge[i] += absorbed;
+                        drainedTotal += absorbed;
                     }
                 }
             }
+
+            LastDrained = drainedTotal;
+            return drainedTotal;
         }
     }
 }

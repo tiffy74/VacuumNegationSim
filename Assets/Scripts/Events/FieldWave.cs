@@ -1,29 +1,31 @@
-﻿using Assets.Scripts.Domain;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using UnityEngine;
+﻿using UnityEngine;
+using Assets.Scripts.Domain; // adjust if your GridState/SimContext live elsewhere
 
 namespace Assets.Scripts.Events
 {
-    static class FieldWave
+    public static class FieldWave
     {
-        // 4-neighbour connectivity
-        private static readonly int[] dx = { 0, 0, -1, 1 };
-        private static readonly int[] dy = { -1, 1, 0, 0 };
-
         /// <summary>
-        /// Expands FieldPresent outward. Records FieldFirstTick the first time field appears in a cell.
+        /// Energy-coupled field propagation.
+        /// A field cell can create field in a neighbor only by paying FieldAdvanceCost from its Nlocal.
+        /// Optionally requires the source neighbor to be viable.
+        ///
+        /// This prevents the field/geometry front from racing far ahead of the energy wave.
         /// </summary>
-        public static void PropagateFieldWave(GridState s, int tick, float spreadProbability)
+        public static void PropagateFieldWave(
+            GridState s,
+            int tick,
+            float fieldAdvanceChance,
+            float fieldAdvanceCost,
+            float fieldAdvanceMinSource,
+            bool requireViability = false,
+            bool seedEnergyOnAdvance = false,
+            float seedEnergy = 0.1f)
         {
-            // If you want "do nothing" probabilities to be cheap:
-            if (spreadProbability <= 0f) return;
-
-            // We'll build a nextField buffer (bool[]) but reuse it rather than Clone() if you later add a buffer.
             bool[] nextField = (bool[])s.FieldPresent.Clone();
+
+            int[] dx = { 0, 0, -1, 1 };
+            int[] dy = { -1, 1, 0, 0 };
 
             for (int y = 0; y < s.H; y++)
             {
@@ -31,42 +33,50 @@ namespace Assets.Scripts.Events
                 {
                     int i = s.Idx(x, y);
 
-                    // Already has field -> nothing to do here
-                    if (s.FieldPresent[i]) continue;
+                    if (s.FieldPresent[i]) continue;     // already has field
+                    if (s.IsBlackHole[i]) continue;      // optional: BH blocks field
+                    if (s.IsVacuum[i]) continue;         // optional: vacuum blocks field
 
-                    // Optional: don't expand into permanent vacuum cells if you use them as sinks
-                    if (s.IsVacuum[i]) continue;
-
-                    // If any neighbor has field, we may acquire it this tick
-                    bool neighborHasField = false;
-
+                    // Look for any neighbor with field that can "pay" to expand
                     for (int d = 0; d < 4; d++)
                     {
                         int nx = x + dx[d];
                         int ny = y + dy[d];
-
-                        if (nx < 0 || nx >= s.W || ny < 0 || ny >= s.H)
-                            continue;
+                        if (nx < 0 || nx >= s.W || ny < 0 || ny >= s.H) continue;
 
                         int ni = s.Idx(nx, ny);
+                        if (!s.FieldPresent[ni]) continue;
 
-                        if (s.FieldPresent[ni])
+                        // Optional: require source neighbor to be viable & active
+                        if (requireViability)
                         {
-                            neighborHasField = true;
-                            break;
+                            if (!(s.V[ni] > 0f && s.Active[ni] == 1))
+                                continue;
                         }
-                    }
 
-                    if (!neighborHasField) continue;
+                        // Must have enough energy to advance field
+                        if (s.Nlocal[ni] < fieldAdvanceMinSource)
+                            continue;
 
-                    // Probabilistic spread
-                    if (UnityEngine.Random.value < spreadProbability)
-                    {
+                        // Chance gate
+                        if (Random.value > fieldAdvanceChance)
+                            continue;
+
+                        // Pay energy
+                        s.Nlocal[ni] = Mathf.Max(0f, s.Nlocal[ni] - fieldAdvanceCost);
+
+                        // Create field
                         nextField[i] = true;
 
-                        // Mark first tick we gained field
+                        // mark arrival tick (used by renderer to show thin yellow ring)
                         if (s.FieldFirstTick[i] == -1)
                             s.FieldFirstTick[i] = tick;
+
+                        // Optional: seed minimal energy so energy doesn't lag absurdly
+                        if (seedEnergyOnAdvance)
+                            s.Nlocal[i] = Mathf.Max(s.Nlocal[i], seedEnergy);
+
+                        break;
                     }
                 }
             }

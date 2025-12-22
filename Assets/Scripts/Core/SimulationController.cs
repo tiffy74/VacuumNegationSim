@@ -59,26 +59,34 @@ public class SimulationController : MonoBehaviour
     [SerializeField] public float MinEnergyForPersistence = 5f;
 
     [Header("Viability / Threshold")]
-    [SerializeField] public float EthreshBase = 0.25f;
+    [SerializeField] public float EthreshBase = 0.18f;
     [SerializeField] public float GlobalScarcityK = 0.3f;
-    [SerializeField] public float EntropyPenalty = 0.15f;
-    [SerializeField] public float DecayLoss = 0.01f;
+    [SerializeField] public float EntropyPenalty = 0.02f;
+    [SerializeField] public float DecayLoss = 0.003f;
 
     [Header("Propagation")]
-    [SerializeField] public float PropagateFrac = 0.12f;
-    [SerializeField] public float MinBudgetToPropagate = 2f;
-    [SerializeField] public float ActivationCost = 2f;
+    [SerializeField] public float PropagateFrac = 0.25f;
+    [SerializeField] public float MinBudgetToPropagate = 0.1f;
+    [SerializeField] public float ActivationCost = 0.25f;
 
     [Header("Entropy Dynamics")]
-    [SerializeField] public float EntropyGainPerUse = 0.02f;
-    [SerializeField] public float EntropyDiffuseRate = 0.06f;
-    [SerializeField] public float EntropyDecay = 0.015f;
+    [SerializeField] public float EntropyGainPerUse = 0.2f;
+    [SerializeField] public float EntropyDiffuseRate = 0.2f;
+    [SerializeField] public float EntropyDecay = 0.02f;
 
     [Header("Local Limits")]
     [SerializeField] public float NlocalMax = 5e4f;
     [SerializeField] public float VacuumEventProbability = 0.0002f; // Probability per cell
     [SerializeField] public float VacuumEventEntropy = 0.5f; // The amount of entropy per vacuum event
     [SerializeField] public float ExpansionRate = 1.0f; // Scale factor per tick
+
+    [Header("Field Propagation")]
+    [SerializeField] float FieldAdvanceChance = 0.25f; // probability once conditions are met
+    [SerializeField] float FieldAdvanceCost = 0.05f; // energy paid by the source cell
+    [SerializeField] float FieldAdvanceMinSource = 0.1f; // must have at least this much to expand field
+    [SerializeField] bool RequireViabilityForField = false;
+    [SerializeField] bool SeedEnergyOnFieldAdvance = true;
+    [SerializeField] float FieldSeedEnergy = 0.1f;
 
     [Header("Colors")]
     [SerializeField] public Color VoidColor = new Color(0.05f, 0.05f, 0.08f, 1f);
@@ -90,11 +98,6 @@ public class SimulationController : MonoBehaviour
     [SerializeField] public float SpatialDecayK = 0.5f;
 
     [SerializeField] float ticksPerSecond = 10f;
-
-    public float FieldAdvanceCost = 0.2f;      // energy paid by the source cell
-    public float FieldAdvanceMinSource = 1.0f; // must have at least this much to expand field
-    public float FieldAdvanceChance = 0.3f;    // probability once conditions are met
-
 
     // ===== Per-cell state (flattened arrays sized Width*Height) =====
     public float[] rNorm;
@@ -109,6 +112,7 @@ public class SimulationController : MonoBehaviour
     private List<Vector2Int> activeCells = new List<Vector2Int>();
     private GridRenderer renderer;
     bool running = true;
+    private bool[] lastBlackHoles;
 
     void Start()
     {
@@ -123,6 +127,7 @@ public class SimulationController : MonoBehaviour
         // 3) Create pure state + context (engine-owned)
         state = new GridState(Grid.Width, Grid.Height);
         ctx = new SimContext(cfg, NGlobal, ScaleFactor);
+        lastBlackHoles = new bool[state.Len];
 
         // 4) Initialise the simulation state (a refactored version of your InitState)
         // IMPORTANT: this method should ONLY write into `state` arrays + ctx (no visuals).
@@ -135,13 +140,28 @@ public class SimulationController : MonoBehaviour
         new LegacyTickStep(
             ComputeViability,
             CountPersistenceConfigurations,
-            () => FieldWave.PropagateFieldWave(state, ctx.Tick, 0.5f),
+            () => FieldWave.PropagateFieldWave(
+                state,
+                ctx.Tick,
+                FieldAdvanceChance,
+                FieldAdvanceCost,
+                FieldAdvanceMinSource,
+                RequireViabilityForField,
+                SeedEnergyOnFieldAdvance,
+                FieldSeedEnergy
+            ),
             () => BlackHoles.GrowBlackHoles(state),
             () => BlackHoles.BlackHoleAttractEnergy(state)
         )
         });
 
-        renderer = new GridRenderer(Grid.Width, Grid.Height, views);
+        renderer = new GridRenderer(
+            Grid.Width, Grid.Height, views,
+            VoidColor,               // from your inspector
+            NullspaceColor,          // your dim field colour
+            ShowEntropyTint
+        );
+        renderer.ViabilityColorScale = 40f;
 
         // 6) Start the loop (unchanged)
         StartCoroutine(SimLoop());
@@ -247,12 +267,151 @@ public class SimulationController : MonoBehaviour
 
     void TickSimulation()
     {
-        engine.Tick(ctx);
-        
-        if (ctx.Tick % 10 == 0) // log every 10 ticks
-            LogTickSummary(state, ctx);
-        UpdateVisualsFromState(state);
+        if (ctx.Tick % 10 == 0)
+            Debug.Log($"[Tick {ctx.Tick}] TickSimulation start (A)");
 
+        engine.Tick(ctx);
+
+        // Debug probe: center cell and a cell toward the front
+        int cx = state.W / 2;
+        int cy = state.H / 2;
+        int frontX = Math.Min(state.W - 1, cx + 5);
+        int frontY = cy;
+        int ci = state.Idx(cx, cy);
+        int fi = state.Idx(frontX, frontY);
+
+        Debug.Log(
+            $"[Tick {ctx.Tick}] Center: In={state.Incoming[ci]:F4} N={state.Nlocal[ci]:F4} Field={state.FieldPresent[ci]} Active={state.Active[ci]} V={state.V[ci]:F4} | " +
+            $"Front({frontX},{frontY}): In={state.Incoming[fi]:F4} N={state.Nlocal[fi]:F4} Field={state.FieldPresent[fi]} Active={state.Active[fi]} V={state.V[fi]:F4}");
+
+        // Outer-region propagation debug every 20 ticks
+        if (ctx.Tick % 20 == 0)
+        {
+            int vPosOuter = 0;
+            int inPosOuter = 0;
+            float vMinOuter = float.PositiveInfinity;
+            float vMaxOuter = float.NegativeInfinity;
+
+            for (int y = 0; y < state.H; y++)
+            {
+                for (int x = 0; x < state.W; x++)
+                {
+                    // skip seed patch (5x5 around center)
+                    if (x >= cx - 2 && x <= cx + 2 && y >= cy - 2 && y <= cy + 2)
+                        continue;
+
+                    int idx = state.Idx(x, y);
+                    if (state.V[idx] > 0f)
+                    {
+                        vPosOuter++;
+                        if (state.V[idx] < vMinOuter) vMinOuter = state.V[idx];
+                        if (state.V[idx] > vMaxOuter) vMaxOuter = state.V[idx];
+                    }
+                    if (state.Incoming[idx] > 0f) inPosOuter++;
+                }
+            }
+
+            if (vMinOuter == float.PositiveInfinity) vMinOuter = 0f;
+            if (vMaxOuter == float.NegativeInfinity) vMaxOuter = 0f;
+
+            Debug.Log($"[Tick {ctx.Tick}] Outer region: V>0 count={vPosOuter}, Incoming>0 count={inPosOuter}, Vmin={vMinOuter:F4}, Vmax={vMaxOuter:F4}");
+
+            // Frontier diagnostics near field boundary
+            int fieldCount = 0;
+            int fieldArrivals = 0;
+            int energyCount = 0;
+            int viableCount = 0;
+            int blackHoleCount = 0;
+            int frontierViable = 0;
+            float frontierVmin = float.PositiveInfinity;
+            float frontierVmax = float.NegativeInfinity;
+
+            int arrivalTick = ctx.Tick - 1;
+
+            float bhDrained = Assets.Scripts.Events.BlackHoles.LastDrained;
+
+            for (int i = 0; i < state.Len; i++)
+            {
+                if (state.FieldPresent[i])
+                {
+                    fieldCount++;
+                    if (state.FieldFirstTick[i] == arrivalTick || state.FieldFirstTick[i] == ctx.Tick)
+                        fieldArrivals++;
+                }
+
+                if (state.IsBlackHole[i])
+                    blackHoleCount++;
+
+                if (state.Nlocal[i] > MinBudgetToPropagate)
+                    energyCount++;
+                if (state.V[i] > 0f)
+                    viableCount++;
+
+                // frontier ring: recent field arrivals within last 5 ticks, excluding seed patch
+                if (state.FieldPresent[i] && state.FieldFirstTick[i] >= ctx.Tick - 5)
+                {
+                    int fx = i % state.W;
+                    int fy = i / state.W;
+                    if (!(fx >= cx - 2 && fx <= cx + 2 && fy >= cy - 2 && fy <= cy + 2))
+                    {
+                        if (state.V[i] > 0f)
+                        {
+                            frontierViable++;
+                            if (state.V[i] < frontierVmin) frontierVmin = state.V[i];
+                            if (state.V[i] > frontierVmax) frontierVmax = state.V[i];
+                        }
+                    }
+                }
+            }
+
+            if (frontierVmin == float.PositiveInfinity) frontierVmin = 0f;
+            if (frontierVmax == float.NegativeInfinity) frontierVmax = 0f;
+
+            float bhNeighborEnergySum = 0f;
+            int bhNeighborCount = 0;
+            int blackHoleNew = 0;
+            for (int i = 0; i < state.Len; i++)
+            {
+                if (state.IsBlackHole[i])
+                {
+                    blackHoleCount++;
+                    if (lastBlackHoles != null && i < lastBlackHoles.Length && !lastBlackHoles[i])
+                        blackHoleNew++;
+
+                    // average energy of field neighbors around BH
+                    int bx = i % state.W;
+                    int by = i / state.W;
+                    int[] dx = { 0, 0, -1, 1 };
+                    int[] dy = { -1, 1, 0, 0 };
+                    for (int d = 0; d < 4; d++)
+                    {
+                        int nx = bx + dx[d];
+                        int ny = by + dy[d];
+                        if (nx < 0 || nx >= state.W || ny < 0 || ny >= state.H)
+                            continue;
+                        int ni = state.Idx(nx, ny);
+                        if (state.IsBlackHole[ni]) continue;
+                        if (!state.FieldPresent[ni]) continue;
+                        bhNeighborEnergySum += state.Nlocal[ni];
+                        bhNeighborCount++;
+                    }
+                }
+            }
+
+            float bhNeighborEnergyAvg = bhNeighborCount > 0 ? bhNeighborEnergySum / bhNeighborCount : 0f;
+
+            Debug.Log($"[Tick {ctx.Tick}] FieldCount={fieldCount} Arrivals={fieldArrivals} BlackHoles={blackHoleCount} NewBH={blackHoleNew} BHNeighborN={bhNeighborEnergyAvg:F3} Drained={bhDrained:F3} EnergyCount>{MinBudgetToPropagate}={energyCount} Viable={viableCount} FrontierViable={frontierViable} FrontierVmin={frontierVmin:F3} FrontierVmax={frontierVmax:F3}");
+
+            // cache BH state for next tick
+            if (lastBlackHoles != null && lastBlackHoles.Length == state.Len)
+            {
+                for (int i = 0; i < state.Len; i++)
+                    lastBlackHoles[i] = state.IsBlackHole[i];
+            }
+        }
+
+        LogTickSummary(state, ctx);
+        UpdateVisualsFromState(state);
     }
 
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
@@ -267,7 +426,7 @@ public class SimulationController : MonoBehaviour
         // Safety: if called before Start() fully initialises
         if (renderer == null || views == null) return;
 
-        renderer.Render(s);
+        renderer.Render(s, ctx);
     }
     int CountPersistenceConfigurations(int cellIndex)
     {

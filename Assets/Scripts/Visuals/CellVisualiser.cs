@@ -22,27 +22,27 @@ public class CellVisualiser : MonoBehaviour
 
     float NormalizeViability(float v)
     {
-        // Log compression: preserves gradients above 1
-        // v = 1 -> ~0.5, v = 10 -> ~0.8, v < 1 smoothly spreads out
-        return Mathf.Clamp01(Mathf.Log10(1f + Mathf.Max(0f, v)));
+        // Broader range to avoid pushing most values to the hot end
+        const float VmaxVisual = 2.0f;
+        return Mathf.Clamp01(v / VmaxVisual);
     }
+
     public Color GetViabilityColor(float viability)
     {
-        float t = NormalizeViability(viability);
+        float t = Mathf.Clamp01(viability);
 
-        // Use a smooth gradient: blue (low) -> cyan -> green -> yellow -> orange -> red -> white (high)
-        if (t < 0.2f)
-            return Color.Lerp(Color.blue, Color.cyan, t / 0.2f);
-        else if (t < 0.4f)
-            return Color.Lerp(Color.cyan, Color.green, (t - 0.2f) / 0.2f);
-        else if (t < 0.6f)
-            return Color.Lerp(Color.green, Color.yellow, (t - 0.4f) / 0.2f);
-        else if (t < 0.8f)
-            return Color.Lerp(Color.yellow, new Color(1.0f, 0.5f, 0.0f), (t - 0.6f) / 0.2f); // yellow to orange
-        else if (t < 0.95f)
-            return Color.Lerp(new Color(1.0f, 0.5f, 0.0f), Color.red, (t - 0.8f) / 0.15f); // orange to red
+        if (t < 0.1f)
+            return Color.Lerp(Color.black, Color.blue, t / 0.1f);
+        else if (t < 0.25f)
+            return Color.Lerp(Color.blue, Color.cyan, (t - 0.1f) / 0.15f);
+        else if (t < 0.5f)
+            return Color.Lerp(Color.cyan, Color.green, (t - 0.25f) / 0.25f);
+        else if (t < 0.75f)
+            return Color.Lerp(Color.green, Color.yellow, (t - 0.5f) / 0.25f);
+        else if (t < 0.9f)
+            return Color.Lerp(Color.yellow, new Color(1.0f, 0.7f, 0.2f), (t - 0.75f) / 0.15f); // yellow->amber
         else
-            return Color.Lerp(Color.red, Color.white, (t - 0.95f) / 0.05f); // red to white for very high viability
+            return Color.Lerp(new Color(1.0f, 0.7f, 0.2f), new Color(1.0f, 0.85f, 0.6f), (t - 0.9f) / 0.1f); // amber->light peach (avoid deep red)
     }
     public void SetViabilityColor(float viability)
     {
@@ -52,18 +52,20 @@ public class CellVisualiser : MonoBehaviour
         Color color = Color.black; // Default color
 
         float t = NormalizeViability(viability);
-        if (t < 0.002f)
-            color = Color.Lerp(Color.black, Color.blue, t / 0.2f);        // 0.0–0.2
-        else if (t < 0.04f)
-            color = Color.Lerp(Color.blue, Color.cyan, (t - 0.2f) / 0.2f); // 0.2–0.4
-        else if (t < 0.6f)
-            color = Color.Lerp(Color.cyan, Color.green, (t - 0.4f) / 0.2f); // 0.4–0.6
-        else if (t < 0.8f)
-            color = Color.Lerp(Color.green, Color.yellow, (t - 0.6f) / 0.2f); // 0.6–0.8
+        if (t < 0.1f)
+            color = Color.Lerp(Color.black, Color.blue, t / 0.1f);
+        else if (t < 0.25f)
+            color = Color.Lerp(Color.blue, Color.cyan, (t - 0.1f) / 0.15f);
+        else if (t < 0.5f)
+            color = Color.Lerp(Color.cyan, Color.green, (t - 0.25f) / 0.25f);
+        else if (t < 0.75f)
+            color = Color.Lerp(Color.green, Color.yellow, (t - 0.5f) / 0.25f);
+        else if (t < 0.9f)
+            color = Color.Lerp(Color.yellow, new Color(1.0f, 0.7f, 0.2f), (t - 0.75f) / 0.15f);
         else
-            color = Color.Lerp(Color.yellow, Color.red, (t - 0.8f) / 0.2f);   // 0.8–1.0
+            color = Color.Lerp(new Color(1.0f, 0.7f, 0.2f), new Color(1.0f, 0.85f, 0.6f), (t - 0.9f) / 0.1f);
+
         _renderer.color = color;
-        Debug.Log($"[VISUAL] Set color for viability {viability:F3} to {_renderer.color}");
     }
     Color ApplyRadialShading(Color baseColor, float rNorm)
     {
@@ -87,7 +89,7 @@ public class CellVisualiser : MonoBehaviour
         float entropyBlend = Mathf.Pow(eNorm, 1.2f) * 0.4f;
 
         // Only fade to black if viability is extremely low
-        if (vNorm < 0.05f)
+        if (vNorm < 0.00005f)
         {
             Color entropyOverlay = Color.Lerp(viabilityColor, Color.blue, entropyBlend);
             viabilityColor = entropyOverlay;
@@ -97,6 +99,10 @@ public class CellVisualiser : MonoBehaviour
         SetCombinedColor(viabilityColor);
     }
 
+    public void SetViability(float v)
+    {
+        SetViabilityWithEntropy(v, 0f);
+    }
 
     public void SetCombinedColor(Color viabilityColor)
     {

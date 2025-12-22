@@ -1998,26 +1998,32 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5c3507d525883e04e80218d928e6e582, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  NGlobalMax: 2e+10
-  NGlobal: 1e+9
-  GlobalReplenishPerTick: 100
-  MinEnergyForPersistence: 1
-  EthreshBase: 10
-  GlobalScarcityK: 2
-  EntropyPenalty: 0.01
-  DecayLoss: 0.0001
-  PropagateFrac: 0.2
-  MinBudgetToPropagate: 0.01
-  ActivationCost: 1000
-  EntropyGainPerUse: 0.001
-  EntropyDiffuseRate: 0.001
-  EntropyDecay: 0.01
-  NlocalMax: 20000000
-  VacuumEventProbability: 0.001
-  VacuumEventEntropy: 1
-  ExpansionRate: 1.01
+  NGlobalMax: 50000000
+  NGlobal: 10000000
+  GlobalReplenishPerTick: 200
+  MinEnergyForPersistence: 5
+  EthreshBase: 0.18
+  GlobalScarcityK: 0.3
+  EntropyPenalty: 0.02
+  DecayLoss: 0.003
+  PropagateFrac: 0.25
+  MinBudgetToPropagate: 0.1
+  ActivationCost: 0.25
+  EntropyGainPerUse: 0.2
+  EntropyDiffuseRate: 0.2
+  EntropyDecay: 0.02
+  NlocalMax: 50000
+  VacuumEventProbability: 0.0002
+  VacuumEventEntropy: 0.5
+  ExpansionRate: 1
+  FieldAdvanceChance: 0.25
+  FieldAdvanceCost: 0.05
+  FieldAdvanceMinSource: 0.1
+  RequireViabilityForField: 0
+  SeedEnergyOnFieldAdvance: 1
+  FieldSeedEnergy: 0.1
   VoidColor: {r: 0.05, g: 0.05, b: 0.08, a: 1}
-  ShowEntropyTint: 1
+  ShowEntropyTint: 0
   VacuumEnergyColor: {r: 0.48, g: 0.25, b: 0.52, a: 1}
   NullspaceColor: {r: 0.15, g: 0, b: 0.25, a: 1}
   ScaleFactor: 1

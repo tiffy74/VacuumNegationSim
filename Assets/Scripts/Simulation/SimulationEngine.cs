@@ -20,6 +20,9 @@ namespace Assets.Scripts.Simulation
 
         public void Tick(SimContext ctx)
         {
+            if (ctx.Tick % 10 == 0)
+                UnityEngine.Debug.Log($"[Tick {ctx.Tick}] Engine.Tick start (B)");
+
             for (int i = 0; i < _steps.Count; i++)
                 _steps[i].Execute(State, ctx);
 

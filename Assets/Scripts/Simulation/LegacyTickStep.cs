@@ -32,15 +32,44 @@ namespace Assets.Scripts.Simulation
 
         public void Execute(GridState s, SimContext ctx)
         {
+            if (ctx.Tick % 10 == 0)
+                UnityEngine.Debug.Log($"[Tick {ctx.Tick}] LegacyTickStep.Execute start (C)");
+
+            void LogStats(string stage)
+            {
+                if (ctx.Tick % 10 != 0) return;
+
+                double sumN = 0, sumIn = 0, sumEnt = 0;
+                int fieldCount = 0, activeCount = 0;
+                float vMin = float.PositiveInfinity, vMax = float.NegativeInfinity;
+
+                for (int i = 0; i < s.Len; i++)
+                {
+                    sumN += s.Nlocal[i];
+                    sumIn += s.Incoming[i];
+                    sumEnt += s.Entropy[i];
+                    if (s.FieldPresent[i]) fieldCount++;
+                    if (s.Active[i] == 1) activeCount++;
+                    float v = s.V[i];
+                    if (v < vMin) vMin = v;
+                    if (v > vMax) vMax = v;
+                }
+
+                UnityEngine.Debug.Log(
+                    $"[Tick {ctx.Tick}] {stage} | sumN={sumN:F3} sumIn={sumIn:F3} field={fieldCount} active={activeCount} vMin={vMin:F3} vMax={vMax:F3} sumEnt={sumEnt:F3}");
+            }
+
+            LogStats("BEFORE Pass1");
+
             // 1. Expand the field wave first
             _propagateFieldWave();
 
             Pass1.GatherOutflow(
                 s.W, s.H,
-                s.Nlocal, s.V, s.IsVacuum, s.Incoming,
+                s.Nlocal, s.V, s.Active, s.IsVacuum, s.Incoming,
                 ctx.Cfg.MinBudgetToPropagate, ctx.Cfg.PropagateFrac,
                 s.FieldPresent, s.IsBlackHole, s.BlackHoleCharge,
-                200.0f, ctx.Cfg.MatterAheadThreshold,
+                1.0f, ctx.Cfg.MatterAheadThreshold,
                 s.FieldFirstTick, s.EnergyFirstTick
             );
 
@@ -55,6 +84,8 @@ namespace Assets.Scripts.Simulation
                 s.Incoming,
                 ctx.Tick
             );
+
+            LogStats("AFTER Pass1");
 
             Pass2.ApplyAndViability(
                 (x, y) => s.Idx(x, y),
@@ -81,14 +112,20 @@ namespace Assets.Scripts.Simulation
                 ctx.Tick
             );
 
-            _growBlackHoles();
-            _blackHoleAttractEnergy();
+            LogStats("AFTER Pass2");
+
+            // Black holes are static; no spread. Apply attraction/drain.
+            BlackHoles.BlackHoleAttractEnergy(s, 0.2f, true);
 
             Pass3.GlobalRecharge(ref ctx.NGlobal, ctx.Cfg.NGlobalMax, ctx.Cfg.GlobalReplenishPerTick);
+
+            LogStats("AFTER Pass3");
 
             ctx.ScaleFactor *= ctx.Cfg.ExpansionRate;
 
             Pass4.EntropyDiffuse(s.W, s.H, s.Entropy, s.EntropyNext, ctx.Cfg.EntropyDiffuseRate, ctx.Cfg.EntropyDecay);
+
+            LogStats("AFTER Pass4");
         }
     }
 }

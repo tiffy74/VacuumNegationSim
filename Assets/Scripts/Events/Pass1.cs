@@ -12,7 +12,7 @@ namespace Assets.Scripts.Events
     {
         public static void GatherOutflow(
             int width, int height,
-            float[] Nlocal, float[] V, bool[] IsVacuum, float[] incoming,
+            float[] Nlocal, float[] V, byte[] Active, bool[] IsVacuum, float[] incoming,
             float MinBudgetToPropagate, float PropagateFrac,
             bool[] FieldPresent, bool[] IsBlackHole, float[] BlackHoleCharge, float blackHoleThreshold, float MatterAheadThreshold,
             int[] FieldFirstTick, int[] EnergyFirstTick )
@@ -35,15 +35,15 @@ namespace Assets.Scripts.Events
 
                     if (IsBlackHole[i]) continue;
                     if (Nlocal[i] <= MinBudgetToPropagate) continue;
-                    if (V[i] <= 0f) continue; // only viable cells push outward
+                    // allow outflow if active or mildly viable
+                    if (!(Active[i] == 1 || V[i] > -1e-3f)) continue; // frontier ignition
 
-                    float available = Nlocal[i] * PropagateFrac;
+                    float frac = Mathf.Clamp01(PropagateFrac); // treat as fraction of current energy
+                    float available = Nlocal[i] * frac;
                     if (available <= 0f) continue;
 
-                    // CONSERVE: remove from source
-                    Nlocal[i] = Mathf.Max(0f, Nlocal[i] - available);
-
                     float portion = available * 0.25f; // 4-neighbour split
+                    int sentCount = 0;
 
                     for (int d = 0; d < 4; d++)
                     {
@@ -55,15 +55,16 @@ namespace Assets.Scripts.Events
                         int neighborIdx = Idx(nx, ny);
                         if (IsVacuum[neighborIdx]) continue;
 
-                        // Normal propagation into field-present neighbor
                         if (FieldPresent[neighborIdx])
                         {
                             incoming[neighborIdx] += portion;
+                            sentCount++;
                         }
-                        else if (!IsBlackHole[neighborIdx] && Nlocal[neighborIdx] > MatterAheadThreshold &&
+                        else if (!IsBlackHole[neighborIdx] &&
                                  IsFieldBoundary(neighborIdx, FieldPresent, width, height, Idx))
                         {
                             BlackHoleCharge[neighborIdx] += portion;
+                            sentCount++;
 
                             if (BlackHoleCharge[neighborIdx] > blackHoleThreshold)
                             {
@@ -73,11 +74,10 @@ namespace Assets.Scripts.Events
                         }
                     }
 
-                    //if (portion > 0f)
-                    //{
-                    //    Debug.Log($"Cell ({x},{y}) outflow portion={portion} to neighbors");
-                    //}
-                        
+                    // Subtract only the energy actually sent
+                    float sentTotal = portion * sentCount;
+                    if (sentTotal > 0f)
+                        Nlocal[i] = Mathf.Max(0f, Nlocal[i] - sentTotal);
                 }
             }
         }

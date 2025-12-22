@@ -100,8 +100,8 @@ namespace Assets.Scripts.Events
                             if (y > 0 && Active[i - width] == 1) activeNeighbors++;
                             if (y < height - 1 && Active[i + width] == 1) activeNeighbors++;
 
-                            // if (!IsVacuum[i] && V[i] <= 0f && Nlocal[i] > 0f)
-                            //    Nlocal[i] = Mathf.Min(0.5f, Nlocal[i] + 0.05f * activeNeighbors); // cap at 0.5f for static cells
+                            if (!IsVacuum[i] && V[i] <= 0f && Nlocal[i] > 0f)
+                            Nlocal[i] = Mathf.Min(0.5f, Nlocal[i] + 0.05f * activeNeighbors); // cap at 0.5f for static cells
 
                             // Final clamp to ensure non-negative energy
                             Nlocal[i] = Mathf.Max(0f, Nlocal[i]);

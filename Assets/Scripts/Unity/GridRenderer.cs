@@ -1,59 +1,99 @@
-﻿using Assets.Scripts.Domain;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using UnityEngine;
+﻿using UnityEngine;
+using Assets.Scripts.Domain; // adjust if GridState/SimContext live elsewhere
 
 namespace Assets.Scripts.Unity
 {
     public sealed class GridRenderer
     {
-        private readonly int width;
-        private readonly int height;
-        private readonly CellVisualiser[,] views;
+        private readonly int _w;
+        private readonly int _h;
+        private readonly CellVisualiser[,] _views;
 
-        // Optional colour constants (can later move to a config asset)
-        private readonly Color voidColor = new Color(0.15f, 0.0f, 0.25f, 1f);
-        private readonly Color fieldFrontColor = Color.yellow;
+        // You can inject colours from SimulationController if you prefer.
+        private readonly Color _voidColor;
+        private readonly Color _fieldDimColor;
+        private readonly Color _blackHoleColor = new Color(0.85f, 0f, 0.85f); // vivid magenta
 
-        public GridRenderer(int width, int height, CellVisualiser[,] views)
+        public float ViabilityColorScale = 40f; // because your V is ~0.01-0.04 typically
+        public bool ShowEntropyTint = false;
+        
+        public GridRenderer(int w, int h, CellVisualiser[,] views,
+                            Color voidColor, Color fieldDimColor,
+                            bool showEntropyTint = false)
         {
-            this.width = width;
-            this.height = height;
-            this.views = views;
+            _w = w;
+            _h = h;
+            _views = views;
+            _voidColor = voidColor;
+            _fieldDimColor = fieldDimColor;
+            ShowEntropyTint = showEntropyTint;
         }
 
-        public void Render(GridState s)
+        /// <summary>
+        /// Rendering
+        /// - Black hole: black
+        /// - No field: voidColor
+        /// - Field arrived this tick: yellow (thin front ring)
+        /// - Viable+active: viability colouring
+        /// - Field but not viable: dim field colour
+        /// - Vacuum: dim field colour (or special colour if you prefer)
+        /// </summary>
+        public void Render(GridState s, SimContext ctx)
         {
-            for (int y = 0; y < height; y++)
+            // Compute per-frame viability max (positive values only)
+            float vMax = 0f;
+            for (int i = 0; i < s.V.Length; i++)
             {
-                for (int x = 0; x < width; x++)
+                if (s.V[i] > vMax) vMax = s.V[i];
+            }
+            float invVmax = vMax > 0f ? 1f / vMax : 0f;
+
+            for (int y = 0; y < _h; y++)
+            {
+                for (int x = 0; x < _w; x++)
                 {
-                    int i = s.Idx(x, y);
-                    var vis = views[x, y];
+                    var vis = _views[x, y];
                     if (vis == null) continue;
 
-                    // --- Rendering rules only ---
-                    // These must NOT modify state.
+                    int i = s.Idx(x, y);
 
-                    // 1) No field → nullspace / void
+                    if (s.IsBlackHole[i])
+                    {
+                        vis.SetColor(_blackHoleColor);
+                        continue;
+                    }
+
                     if (!s.FieldPresent[i])
                     {
-                        vis.SetColor(voidColor);
+                        vis.SetColor(_voidColor);
                         continue;
                     }
 
-                    // 2) Field present but not yet viable → wave/front highlight
-                    if (s.FieldPresent[i] && (s.Active[i] == 0 || s.V[i] <= 0f))
+                    // Thin ring: only yellow the tick it arrives
+                    if (s.FieldFirstTick[i] == ctx.Tick || s.FieldFirstTick[i] == ctx.Tick - 1)
                     {
-                        vis.SetColor(fieldFrontColor);
+                        vis.SetColor(Color.yellow);
                         continue;
                     }
 
-                    // 3) Active + viable → colour by viability + entropy
-                    vis.SetViabilityWithEntropy(s.V[i], s.Entropy[i]);
+                    if (s.IsVacuum[i])
+                    {
+                        vis.SetColor(_fieldDimColor);
+                        continue;
+                    }
+
+                    if (s.Active[i] == 1 && s.V[i] > 0f)
+                    {
+                        float vNorm = Mathf.Clamp01(s.V[i] * invVmax); // per-frame normalization
+                        if (ShowEntropyTint)
+                            vis.SetViabilityWithEntropy(vNorm, s.Entropy[i]);
+                        else
+                            vis.SetViability(vNorm);
+                        continue;
+                    }
+
+                    // Field present but not viable/active
+                    vis.SetColor(_fieldDimColor);
                 }
             }
         }
