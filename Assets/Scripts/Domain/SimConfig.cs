@@ -21,6 +21,9 @@ namespace Assets.Scripts.Domain
 
         public float ExpansionRate, MatterAheadThreshold;
 
+        // Black holes
+        public float BlackHoleFormThreshold = 1.0f;
+
         // Field wave coupling
         public float FieldAdvanceCost = 0.2f;
         public float FieldAdvanceMinSource = 1.0f;

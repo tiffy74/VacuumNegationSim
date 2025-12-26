@@ -47,7 +47,9 @@ public class SimulationController : MonoBehaviour
             VacuumEventEntropy = VacuumEventEntropy,
 
             ExpansionRate = ExpansionRate,
-            MatterAheadThreshold = MatterAheadThreshold
+            MatterAheadThreshold = MatterAheadThreshold,
+
+            BlackHoleFormThreshold = BlackHoleFormThreshold
         };
     }
 
@@ -112,7 +114,6 @@ public class SimulationController : MonoBehaviour
     private List<Vector2Int> activeCells = new List<Vector2Int>();
     private GridRenderer renderer;
     bool running = true;
-    private bool[] lastBlackHoles;
 
     void Start()
     {
@@ -127,7 +128,6 @@ public class SimulationController : MonoBehaviour
         // 3) Create pure state + context (engine-owned)
         state = new GridState(Grid.Width, Grid.Height);
         ctx = new SimContext(cfg, NGlobal, ScaleFactor);
-        lastBlackHoles = new bool[state.Len];
 
         // 4) Initialise the simulation state (a refactored version of your InitState)
         // IMPORTANT: this method should ONLY write into `state` arrays + ctx (no visuals).
@@ -196,6 +196,11 @@ public class SimulationController : MonoBehaviour
     // It is a line-for-line port of your current InitState(), but writes into GridState + SimContext.
     // No visuals. No coroutines. No Unity objects (except QualitySettings / Application, which you can remove later).
 
+    [Header("Black Hole")]
+    [SerializeField] public float BlackHoleFormThreshold = 0.5f;
+    [SerializeField] public float BlackHoleDrainFrac = 0.05f;
+    private const float BlackHoleEnergyEps = 1e-6f;
+
     void InitStateInto(GridState s, SimContext ctx)
     {
         int len = s.Len;
@@ -217,12 +222,18 @@ public class SimulationController : MonoBehaviour
 
             s.IsBlackHole[i] = false;
             s.BlackHoleCharge[i] = 0f;
+            s.BlackHoleId[i] = 0;
+            s.BlackHoleMass[i] = 0f;
 
             s.ZeroEnergyTicks[i] = 0;
 
             s.FieldFirstTick[i] = -1;
             s.EnergyFirstTick[i] = -1;
         }
+
+        for (int i = 0; i < s.BlackHoleParent.Length; i++)
+            s.BlackHoleParent[i] = i;
+            s.NextBlackHoleId = 1;
 
         // ---- Seed a small central block with energy + field (matches your current InitState) ----
         int cx = s.W / 2;
@@ -240,14 +251,12 @@ public class SimulationController : MonoBehaviour
 
                 int i = s.Idx(x, y);
 
-                s.Nlocal[i] = 0f;   // starting energy (same as your controller)
+                s.Nlocal[i] = 0f;
                 s.Incoming[i] = 0f;
                 s.Entropy[i] = 0f;
                 s.Active[i] = 1;
                 s.FieldPresent[i] = true;
 
-                // Your original InitState did NOT set first-tick markers here, so we don't either.
-                // If you want, you can set:
                 if (s.FieldFirstTick[i] == -1) s.FieldFirstTick[i] = ctx.Tick;
                 if (s.EnergyFirstTick[i] == -1) s.EnergyFirstTick[i] = ctx.Tick;
             }
@@ -328,8 +337,6 @@ public class SimulationController : MonoBehaviour
 
             int arrivalTick = ctx.Tick - 1;
 
-            float bhDrained = Assets.Scripts.Events.BlackHoles.LastDrained;
-
             for (int i = 0; i < state.Len; i++)
             {
                 if (state.FieldPresent[i])
@@ -367,47 +374,7 @@ public class SimulationController : MonoBehaviour
             if (frontierVmin == float.PositiveInfinity) frontierVmin = 0f;
             if (frontierVmax == float.NegativeInfinity) frontierVmax = 0f;
 
-            float bhNeighborEnergySum = 0f;
-            int bhNeighborCount = 0;
-            int blackHoleNew = 0;
-            for (int i = 0; i < state.Len; i++)
-            {
-                if (state.IsBlackHole[i])
-                {
-                    blackHoleCount++;
-                    if (lastBlackHoles != null && i < lastBlackHoles.Length && !lastBlackHoles[i])
-                        blackHoleNew++;
-
-                    // average energy of field neighbors around BH
-                    int bx = i % state.W;
-                    int by = i / state.W;
-                    int[] dx = { 0, 0, -1, 1 };
-                    int[] dy = { -1, 1, 0, 0 };
-                    for (int d = 0; d < 4; d++)
-                    {
-                        int nx = bx + dx[d];
-                        int ny = by + dy[d];
-                        if (nx < 0 || nx >= state.W || ny < 0 || ny >= state.H)
-                            continue;
-                        int ni = state.Idx(nx, ny);
-                        if (state.IsBlackHole[ni]) continue;
-                        if (!state.FieldPresent[ni]) continue;
-                        bhNeighborEnergySum += state.Nlocal[ni];
-                        bhNeighborCount++;
-                    }
-                }
-            }
-
-            float bhNeighborEnergyAvg = bhNeighborCount > 0 ? bhNeighborEnergySum / bhNeighborCount : 0f;
-
-            Debug.Log($"[Tick {ctx.Tick}] FieldCount={fieldCount} Arrivals={fieldArrivals} BlackHoles={blackHoleCount} NewBH={blackHoleNew} BHNeighborN={bhNeighborEnergyAvg:F3} Drained={bhDrained:F3} EnergyCount>{MinBudgetToPropagate}={energyCount} Viable={viableCount} FrontierViable={frontierViable} FrontierVmin={frontierVmin:F3} FrontierVmax={frontierVmax:F3}");
-
-            // cache BH state for next tick
-            if (lastBlackHoles != null && lastBlackHoles.Length == state.Len)
-            {
-                for (int i = 0; i < state.Len; i++)
-                    lastBlackHoles[i] = state.IsBlackHole[i];
-            }
+            Debug.Log($"[Tick {ctx.Tick}] FieldCount={fieldCount} Arrivals={fieldArrivals} BlackHoles={blackHoleCount} EnergyCount>{MinBudgetToPropagate}={energyCount} Viable={viableCount} FrontierViable={frontierViable} FrontierVmin={frontierVmin:F3} FrontierVmax={frontierVmax:F3}");
         }
 
         LogTickSummary(state, ctx);

@@ -32,47 +32,30 @@ namespace Assets.Scripts.Simulation
 
         public void Execute(GridState s, SimContext ctx)
         {
-            if (ctx.Tick % 10 == 0)
-                UnityEngine.Debug.Log($"[Tick {ctx.Tick}] LegacyTickStep.Execute start (C)");
+            bool[] bhPrev = (bool[])s.IsBlackHole.Clone();
 
-            void LogStats(string stage)
+            void EnforceBlackHoleInvariants()
             {
-                if (ctx.Tick % 10 != 0) return;
-
-                double sumN = 0, sumIn = 0, sumEnt = 0;
-                int fieldCount = 0, activeCount = 0;
-                float vMin = float.PositiveInfinity, vMax = float.NegativeInfinity;
-
                 for (int i = 0; i < s.Len; i++)
                 {
-                    sumN += s.Nlocal[i];
-                    sumIn += s.Incoming[i];
-                    sumEnt += s.Entropy[i];
-                    if (s.FieldPresent[i]) fieldCount++;
-                    if (s.Active[i] == 1) activeCount++;
-                    float v = s.V[i];
-                    if (v < vMin) vMin = v;
-                    if (v > vMax) vMax = v;
+                    if (!s.IsBlackHole[i] && !bhPrev[i]) continue;
+                    s.IsBlackHole[i] = true;      // sticky
+                    s.FieldPresent[i] = false;    // no field on BH
+                    s.Active[i] = 0;              // inert
+                    s.Nlocal[i] = 0f;             // no energy
+                    s.Incoming[i] = 0f;           // no inflow
+                    s.Entropy[i] = 1f;            // max entropy for rendering
                 }
-
-                UnityEngine.Debug.Log(
-                    $"[Tick {ctx.Tick}] {stage} | sumN={sumN:F3} sumIn={sumIn:F3} field={fieldCount} active={activeCount} vMin={vMin:F3} vMax={vMax:F3} sumEnt={sumEnt:F3}");
             }
-
-            LogStats("BEFORE Pass1");
-
-            // 1. Expand the field wave first
-            _propagateFieldWave();
 
             Pass1.GatherOutflow(
                 s.W, s.H,
                 s.Nlocal, s.V, s.Active, s.IsVacuum, s.Incoming,
                 ctx.Cfg.MinBudgetToPropagate, ctx.Cfg.PropagateFrac,
                 s.FieldPresent, s.IsBlackHole, s.BlackHoleCharge,
-                1.0f, ctx.Cfg.MatterAheadThreshold,
+                ctx.Cfg.BlackHoleFormThreshold, ctx.Cfg.MatterAheadThreshold,
                 s.FieldFirstTick, s.EnergyFirstTick
             );
-
             Pass1.GatherInflow(
                 s.W, s.H,
                 (x, y) => s.Idx(x, y),
@@ -84,8 +67,10 @@ namespace Assets.Scripts.Simulation
                 s.Incoming,
                 ctx.Tick
             );
+            EnforceBlackHoleInvariants();
 
-            LogStats("AFTER Pass1");
+            _propagateFieldWave();
+            EnforceBlackHoleInvariants();
 
             Pass2.ApplyAndViability(
                 (x, y) => s.Idx(x, y),
@@ -102,7 +87,7 @@ namespace Assets.Scripts.Simulation
                 ctx.Cfg.VacuumEventProbability,
                 ctx.Cfg.VacuumEventEntropy,
                 _computeViability,
-                (i) => _countPersistenceConfigurations(i), // FIX: Use the injected delegate and remove extra args
+                (i) => _countPersistenceConfigurations(i),
                 s.W,
                 ctx.Cfg.PropagateFrac,
                 s.FieldPresent,
@@ -111,21 +96,15 @@ namespace Assets.Scripts.Simulation
                 s.EnergyFirstTick,
                 ctx.Tick
             );
+            EnforceBlackHoleInvariants();
 
-            LogStats("AFTER Pass2");
-
-            // Black holes are static; no spread. Apply attraction/drain.
-            BlackHoles.BlackHoleAttractEnergy(s, 0.2f, true);
+            BlackHoles.BlackHoleAttractEnergy(s, 4f, true);
+            EnforceBlackHoleInvariants();
 
             Pass3.GlobalRecharge(ref ctx.NGlobal, ctx.Cfg.NGlobalMax, ctx.Cfg.GlobalReplenishPerTick);
-
-            LogStats("AFTER Pass3");
-
             ctx.ScaleFactor *= ctx.Cfg.ExpansionRate;
-
             Pass4.EntropyDiffuse(s.W, s.H, s.Entropy, s.EntropyNext, ctx.Cfg.EntropyDiffuseRate, ctx.Cfg.EntropyDecay);
-
-            LogStats("AFTER Pass4");
+            EnforceBlackHoleInvariants();
         }
     }
 }

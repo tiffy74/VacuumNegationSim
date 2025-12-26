@@ -10,10 +10,11 @@ namespace Assets.Scripts.Domain
     {
         public readonly int W, H, Len;
 
-        public float[] Nlocal, Entropy, V, Incoming, EntropyNext, BlackHoleCharge;
+        public float[] Nlocal, Entropy, V, Incoming, EntropyNext, BlackHoleCharge, BlackHoleMass;
         public byte[] Active;
         public bool[] IsVacuum, FieldPresent, IsBlackHole;
-        public int[] ZeroEnergyTicks, FieldFirstTick, EnergyFirstTick;
+        public int[] ZeroEnergyTicks, FieldFirstTick, EnergyFirstTick, BlackHoleId, BlackHoleParent;
+        public int NextBlackHoleId;
         public GridState(int w, int h)
         {
             W = w; H = h; Len = w * h;
@@ -36,6 +37,13 @@ namespace Assets.Scripts.Domain
             FieldFirstTick = new int[Len];
             EnergyFirstTick = new int[Len];
 
+            // Black hole connected-component tracking and mass per component
+            BlackHoleId = new int[Len];
+            BlackHoleParent = new int[Len + 1]; // ids start at 1
+            BlackHoleMass = new float[Len + 1];
+            NextBlackHoleId = 1;
+            for (int i = 0; i < BlackHoleParent.Length; i++)
+                BlackHoleParent[i] = i;
         }
 
         public int Idx(int x, int y) => y * W + x;

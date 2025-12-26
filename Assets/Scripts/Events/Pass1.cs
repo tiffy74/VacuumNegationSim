@@ -60,9 +60,9 @@ namespace Assets.Scripts.Events
                             incoming[neighborIdx] += portion;
                             sentCount++;
                         }
-                        else if (!IsBlackHole[neighborIdx] &&
-                                 IsFieldBoundary(neighborIdx, FieldPresent, width, height, Idx))
+                        else if (!IsBlackHole[neighborIdx])
                         {
+                            // Energy leaked into a cell without field (void or vacuum): charge a black hole
                             BlackHoleCharge[neighborIdx] += portion;
                             sentCount++;
 
@@ -70,6 +70,7 @@ namespace Assets.Scripts.Events
                             {
                                 IsBlackHole[neighborIdx] = true;
                                 BlackHoleCharge[neighborIdx] = 0f;
+                                Debug.Log($"BH created at {neighborIdx} from void-leak; charge reset");
                             }
                         }
                     }

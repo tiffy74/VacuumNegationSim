@@ -69,12 +69,32 @@ namespace Assets.Scripts.Unity
                         continue;
                     }
 
-                    // Thin ring: only yellow the tick it arrives
-                    if (s.FieldFirstTick[i] == ctx.Tick || s.FieldFirstTick[i] == ctx.Tick - 1)
+                    // Thin ring: arrival this tick or last tick
+                    bool isArrival = s.FieldFirstTick[i] == ctx.Tick || s.FieldFirstTick[i] == ctx.Tick - 1;
+
+                    // Frontier: has the field and at least one neighbour without the field (or out of bounds)
+                    bool isFrontier = false;
+                    if (s.FieldPresent[i])
+                    {
+                        // 4-way neighbours
+                        if (x == 0 || !s.FieldPresent[s.Idx(x - 1, y)]) isFrontier = true;
+                        else if (x == _w - 1 || !s.FieldPresent[s.Idx(x + 1, y)]) isFrontier = true;
+                        else if (y == 0 || !s.FieldPresent[s.Idx(x, y - 1)]) isFrontier = true;
+                        else if (y == _h - 1 || !s.FieldPresent[s.Idx(x, y + 1)]) isFrontier = true;
+                    }
+
+                    if (isArrival || isFrontier)
                     {
                         vis.SetColor(Color.yellow);
                         continue;
                     }
+
+                    //// Persist yellow once the field has ever arrived
+                    //if (s.FieldPresent[i] && s.FieldFirstTick[i] >= 0)
+                    //{
+                    //    vis.SetColor(Color.yellow);
+                    //    continue;
+                    //}
 
                     if (s.IsVacuum[i])
                     {
