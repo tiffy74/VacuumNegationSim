@@ -11,7 +11,6 @@ using UnityEngine.InputSystem;
 using UnityEngine.Rendering;
 using UnityEngine.UIElements;
 
-
 public class SimulationController : MonoBehaviour
 {
     // ===== Constants (do not change) =====
@@ -47,9 +46,28 @@ public class SimulationController : MonoBehaviour
             VacuumEventEntropy = VacuumEventEntropy,
 
             ExpansionRate = ExpansionRate,
-            MatterAheadThreshold = MatterAheadThreshold,
+            // MatterAheadThreshold = MatterAheadThreshold,
 
-            BlackHoleFormThreshold = BlackHoleFormThreshold
+            BlackHoleFormThreshold = BlackHoleFormThreshold,
+            BlackHoleDrainFrac = BlackHoleDrainFrac,
+            BlackHoleRecoilFrac = BlackHoleRecoilFrac,
+
+            FieldAdvanceChance = FieldAdvanceChance,
+            FieldAdvanceCost = FieldAdvanceCost,
+            FieldAdvanceMinSource = FieldAdvanceMinSource,
+            FieldAdvanceRequiresViability = RequireViabilityForField,
+            FieldAdvanceSeedsEnergy = SeedEnergyOnFieldAdvance,
+            FieldSeedEnergy = FieldSeedEnergy,
+
+            EntropyGainFromGradient = EntropyGainFromGradient,
+            EntropyGainNearBH = EntropyGainNearBH,
+            EntropyViabilityGainA = EntropyViabilityGainA,
+            EntropyViabilityGainK = EntropyViabilityGainK,
+
+            VoidColor = VoidColor,
+            NullspaceColor = NullspaceColor,
+            ShowEntropyTint = ShowEntropyTint,
+            ViabilityColorScale = 40f
         };
     }
 
@@ -65,6 +83,8 @@ public class SimulationController : MonoBehaviour
     [SerializeField] public float GlobalScarcityK = 0.3f;
     [SerializeField] public float EntropyPenalty = 0.02f;
     [SerializeField] public float DecayLoss = 0.003f;
+    [SerializeField] public float EntropyViabilityGainA = 0.5f;
+    [SerializeField] public float EntropyViabilityGainK = 1.0f;
 
     [Header("Propagation")]
     [SerializeField] public float PropagateFrac = 0.25f;
@@ -75,6 +95,8 @@ public class SimulationController : MonoBehaviour
     [SerializeField] public float EntropyGainPerUse = 0.2f;
     [SerializeField] public float EntropyDiffuseRate = 0.2f;
     [SerializeField] public float EntropyDecay = 0.02f;
+    [SerializeField] public float EntropyGainFromGradient = 0.02f;
+    [SerializeField] public float EntropyGainNearBH = 0.05f;
 
     [Header("Local Limits")]
     [SerializeField] public float NlocalMax = 5e4f;
@@ -99,20 +121,20 @@ public class SimulationController : MonoBehaviour
     [SerializeField] public float SpatialThreshK = -0.6f;
     [SerializeField] public float SpatialDecayK = 0.5f;
 
+    [Header("Render Mode")]
+    [SerializeField] private Assets.Scripts.Unity.RenderMode renderMode = Assets.Scripts.Unity.RenderMode.Viability;
+
     [SerializeField] float ticksPerSecond = 10f;
 
     // ===== Per-cell state (flattened arrays sized Width*Height) =====
-    public float[] rNorm;
-    public const float MatterAheadThreshold = 0.5f;
-    public int[] FieldFirstTick;   // -1 = not yet private
-    public int[] EnergyFirstTick;  // -1 = no energy yet
-    int Idx(int x, int y) => y * Grid.Width + x;
-    public int tick = 0;
+    [NonSerialized] public float[] rNorm;
+    [NonSerialized] public int[] FieldFirstTick;   // -1 = not yet private
+    [NonSerialized] public int[] EnergyFirstTick;  // -1 = no energy yet
 
     public SimulationGrid Grid;
-    public CellVisualiser[,] views;
+    [NonSerialized] public CellVisualiser[,] views;
     private List<Vector2Int> activeCells = new List<Vector2Int>();
-    private GridRenderer renderer;
+    private GridRenderer gridRenderer;
     bool running = true;
 
     void Start()
@@ -137,36 +159,52 @@ public class SimulationController : MonoBehaviour
         // This step wraps your existing Pass1/2/3/4 calls in the same order as before.
         engine = new SimulationEngine(state, new ISimStep[]
         {
-        new LegacyTickStep(
-            ComputeViability,
-            CountPersistenceConfigurations,
-            () => FieldWave.PropagateFieldWave(
-                state,
-                ctx.Tick,
-                FieldAdvanceChance,
-                FieldAdvanceCost,
-                FieldAdvanceMinSource,
-                RequireViabilityForField,
-                SeedEnergyOnFieldAdvance,
-                FieldSeedEnergy
-            ),
-            () => BlackHoles.GrowBlackHoles(state),
-            () => BlackHoles.BlackHoleAttractEnergy(state)
-        )
+            new LegacyTickStep(
+                ComputeViability,
+                CountPersistenceConfigurations,
+                () => {
+                    FieldWave.PropagateFieldWave(
+                        state,
+                        ctx.Tick,
+                        FieldAdvanceChance,
+                        FieldAdvanceCost,
+                        FieldAdvanceMinSource,
+                        RequireViabilityForField,
+                        SeedEnergyOnFieldAdvance,
+                        FieldSeedEnergy
+                    );
+                    BlackHoles.GrowBlackHoles(state);
+                    // BlackHoles.BlackHoleAttractEnergy(state);
+                }
+            )
         });
 
-        renderer = new GridRenderer(
+        gridRenderer = new GridRenderer(
             Grid.Width, Grid.Height, views,
             VoidColor,               // from your inspector
             NullspaceColor,          // your dim field colour
             ShowEntropyTint
         );
-        renderer.ViabilityColorScale = 40f;
+        gridRenderer.ViabilityColorScale = 40f;
 
         // 6) Start the loop (unchanged)
         StartCoroutine(SimLoop());
     }
 
+    void Update()
+    {
+        if (Keyboard.current == null) return;
+        renderMode = Assets.Scripts.Unity.RenderMode.Viability;
+
+        //if (Keyboard.current == null) return;
+
+        //if (Keyboard.current.digit1Key.wasPressedThisFrame)
+        //    renderMode = Assets.Scripts.Unity.RenderMode.Viability;
+        //else if (Keyboard.current.digit2Key.wasPressedThisFrame)
+        //    renderMode = Assets.Scripts.Unity.RenderMode.Energy;
+        //else if (Keyboard.current.digit3Key.wasPressedThisFrame)
+        //    renderMode = Assets.Scripts.Unity.RenderMode.Entropy;
+    }
 
     System.Collections.IEnumerator SimLoop()
     {
@@ -198,14 +236,15 @@ public class SimulationController : MonoBehaviour
 
     [Header("Black Hole")]
     [SerializeField] public float BlackHoleFormThreshold = 0.5f;
-    [SerializeField] public float BlackHoleDrainFrac = 0.05f;
+    [SerializeField] public float BlackHoleDrainFrac = 0f;
+    [SerializeField] public float BlackHoleRecoilFrac = 0f;
     private const float BlackHoleEnergyEps = 1e-6f;
 
     void InitStateInto(GridState s, SimContext ctx)
     {
         int len = s.Len;
 
-        // ---- Clear arrays ----
+        // ---- Clear per-cell arrays ----
         for (int i = 0; i < len; i++)
         {
             s.Nlocal[i] = 0f;
@@ -223,7 +262,6 @@ public class SimulationController : MonoBehaviour
             s.IsBlackHole[i] = false;
             s.BlackHoleCharge[i] = 0f;
             s.BlackHoleId[i] = 0;
-            s.BlackHoleMass[i] = 0f;
 
             s.ZeroEnergyTicks[i] = 0;
 
@@ -231,11 +269,20 @@ public class SimulationController : MonoBehaviour
             s.EnergyFirstTick[i] = -1;
         }
 
+        // ---- Clear BH entity arrays (NOT per-cell length) ----
         for (int i = 0; i < s.BlackHoleParent.Length; i++)
-            s.BlackHoleParent[i] = i;
-            s.NextBlackHoleId = 1;
+            s.BlackHoleParent[i] = 0;
 
-        // ---- Seed a small central block with energy + field (matches your current InitState) ----
+        for (int i = 0; i < s.BlackHoleMass.Length; i++)
+            s.BlackHoleMass[i] = 0f;
+
+        s.NextBlackHoleId = 1;
+
+        // ---- Reset global simulation counters ----
+        ctx.Tick = 0;
+        ctx.ScaleFactor = 1.0f;
+
+        // ---- Seed a small central block with energy + field ----
         int cx = s.W / 2;
         int cy = s.H / 2;
 
@@ -249,30 +296,23 @@ public class SimulationController : MonoBehaviour
                 if (x < 0 || x >= s.W || y < 0 || y >= s.H)
                     continue;
 
-                int i = s.Idx(x, y);
+                int idx = s.Idx(x, y);
 
-                s.Nlocal[i] = 0f;
-                s.Incoming[i] = 0f;
-                s.Entropy[i] = 0f;
-                s.Active[i] = 1;
-                s.FieldPresent[i] = true;
+                s.Nlocal[idx] = 50f;          // <-- IMPORTANT: don't seed with 0
+                s.Incoming[idx] = 0f;
+                s.Entropy[idx] = 0f;
+                s.Active[idx] = 1;
+                s.FieldPresent[idx] = true;
 
-                if (s.FieldFirstTick[i] == -1) s.FieldFirstTick[i] = ctx.Tick;
-                if (s.EnergyFirstTick[i] == -1) s.EnergyFirstTick[i] = ctx.Tick;
+                if (s.FieldFirstTick[idx] == -1) s.FieldFirstTick[idx] = ctx.Tick;
+                if (s.EnergyFirstTick[idx] == -1) s.EnergyFirstTick[idx] = ctx.Tick;
             }
         }
 
-        // ---- Reset global simulation counters ----
-        ctx.Tick = 0;
-
-        // Keep NGlobal/ScaleFactor as whatever you passed into ctx, or reset them here if desired:
-        // ctx.NGlobal = cfgInitialNGlobal;  (if you store that)
-        ctx.ScaleFactor = 1.0f;
-
-        // ---- Frame rate settings (optional; remove once Unity adapter is separated) ----
         QualitySettings.vSyncCount = 0;
         Application.targetFrameRate = 120;
     }
+
 
     void TickSimulation()
     {
@@ -384,16 +424,16 @@ public class SimulationController : MonoBehaviour
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
     float ComputeViability(float incomingFlow, float nlocal, float entropy)
     {
-        float Eloss = DecayLoss + EntropyPenalty * entropy;
-        return (incomingFlow - Eloss) / Mathf.Max(MinViabilityEpsilon, EthreshEff); // V = (Ein - Eloss) / Ethresh
+        float gain = 1f + EntropyViabilityGainA * (1f - Mathf.Exp(-EntropyViabilityGainK * Mathf.Max(0f, entropy)));
+        return (incomingFlow * gain - DecayLoss) / Mathf.Max(MinViabilityEpsilon, EthreshEff);
     }
 
     private void UpdateVisualsFromState(GridState s)
     {
         // Safety: if called before Start() fully initialises
-        if (renderer == null || views == null) return;
+        if (gridRenderer == null || views == null) return;
 
-        renderer.Render(s, ctx);
+        gridRenderer.Render(s, ctx, renderMode);
     }
     int CountPersistenceConfigurations(int cellIndex)
     {
@@ -512,226 +552,3 @@ public class SimulationController : MonoBehaviour
         }
     }
 }
-
-//void UpdateVisuals()
-//{
-//    for (int y = 0; y < Grid.Height; y++)
-//    {
-//        for (int x = 0; x < Grid.Width; x++)
-//        {
-//            int i = Idx(x, y);
-//            var vis = views[x, y];
-//            if (vis == null) continue;
-
-//            if (FieldPresent[i] && (Active[i] == 0 || V[i] <= 0f))
-//            { 
-
-//                    // Just-activated field: bright wave front
-//                    vis.SetColor(Color.yellow);
-//            }
-//            else if (FieldPresent[i] && (Active[i] > 0 || V[i] > 0f))
-//            {
-//                float vForColor = Mathf.Clamp01(V[i] * 2.0f);
-//                vis.SetViabilityWithEntropy(vForColor, Entropy[i]);
-//            }
-//            else if (IsVacuum[i] || Active[i] == 0 || V[i] <= 0f)
-//            {
-//                vis.SetColor(Color.darkViolet);
-//            }
-
-
-
-//            // Optional: debug for center cell
-//            if (x == Grid.Width / 2 && y == Grid.Height / 2)
-//                Debug.Log($"Center: Active={Active[i]}, V={V[i]}, Nlocal={Nlocal[i]}, Entropy={Entropy[i]}");
-//            if (x == Grid.Width / 2 + 1 && y == Grid.Height / 2)
-//                Debug.Log($"Right Neighbor: Active={Active[i]}, V={V[i]}, Nlocal={Nlocal[i]}, Entropy={Entropy[i]}");
-//        }
-//    }
-//}
-
-//void InitStateInto()
-//{
-//    int len = Grid.Width * Grid.Height;
-
-//    Nlocal = new float[len];
-//    Entropy = new float[len];
-//    V = new float[len];
-//    Active = new byte[len];
-//    incoming = new float[len];
-//    entropyNext = new float[len];
-//    IsVacuum = new bool[len];
-//    zeroEnergyTicks = new int[len];
-//    IsBlackHole = new bool[Grid.Width * Grid.Height];
-//    for (int i = 0; i < IsBlackHole.Length; i++)
-//        IsBlackHole[i] = false;
-
-//    for (int i = 0; i < len; i++)
-//    {
-//        Nlocal[i] = 0f;
-//        Entropy[i] = 0f;
-//        V[i] = 0f;
-//        Active[i] = 0;
-//        IsVacuum[i] = false;
-//        zeroEnergyTicks[i] = 0;
-//    }
-
-//    // allocate and clear field presence
-//    FieldPresent = new bool[Grid.Width * Grid.Height];
-//    for (int i = 0; i < FieldPresent.Length; i++)
-//        FieldPresent[i] = false;
-
-//    // seed a small central block with energy and field
-//    int cx = Grid.Width / 2;
-//    int cy = Grid.Height / 2;
-//    for (int dy = -2; dy <= 2; dy++)
-//    {
-//        for (int dx = -2; dx <= 2; dx++)
-//        {
-//            int x = cx + dx;
-//            int y = cy + dy;
-//            if (x < 0 || x >= Grid.Width || y < 0 || y >= Grid.Height)
-//                continue;
-
-//            int i = Idx(x, y);
-//            Nlocal[i] = 5000f;       // starting energy
-//            incoming[i] = 0f;
-//            Entropy[i] = 0f;
-//            Active[i] = 1;
-//            FieldPresent[i] = true;
-//        }
-//    }
-
-//    BlackHoleCharge = new float[Grid.Width * Grid.Height];
-//    for (int i = 0; i < BlackHoleCharge.Length; i++)
-//        BlackHoleCharge[i] = 0f;
-
-//    FieldFirstTick = new int[len];
-//    EnergyFirstTick = new int[len];
-//    for (int i = 0; i < len; i++) { FieldFirstTick[i] = -1; EnergyFirstTick[i] = -1; }
-
-//    QualitySettings.vSyncCount = 0;
-//    Application.targetFrameRate = 120;
-//}
-
-//void PropagateFieldWave(GridState state, SimContext ctx)
-//{
-//    bool[] nextField = (bool[])FieldPresent.Clone();
-//    for (int y = 0; y < Grid.Height; y++)
-//    {
-//        for (int x = 0; x < Grid.Width; x++)
-//        {
-//            int i = Idx(x, y);
-//            if (!FieldPresent[i])
-//            {
-//                // If any neighbor has the field, this cell may get it (with randomness)
-//                int[] dx = { 0, 0, -1, 1 };
-//                int[] dy = { -1, 1, 0, 0 };
-//                for (int d = 0; d < 4; d++)
-//                {
-//                    int nx = x + dx[d], ny = y + dy[d];
-//                    if (nx >= 0 && nx < Grid.Width && ny >= 0 && ny < Grid.Height)
-//                    {
-//                        int ni = Idx(nx, ny);
-//                        if (FieldPresent[ni] && UnityEngine.Random.value < 0.5f) // 20% chance to expand
-//                        {
-//                            nextField[i] = true;
-//                            if (!FieldPresent[i] && FieldPresent[ni] && UnityEngine.Random.value < 0.2f)
-//                            {
-//                                nextField[i] = true; if (FieldFirstTick[i] == -1) FieldFirstTick[i] = tick;   // current global tick break; }
-//                            }
-//                                break;
-//                        }
-//                    }
-//                }
-//            }
-//        }
-//    }
-//    FieldPresent = nextField;
-//}
-
-//void BlackHoleAttractEnergy(GridState s)
-//{
-//    int[] dx = { 0, 0, -1, 1 };
-//    int[] dy = { -1, 1, 0, 0 };
-//    for (int y = 0; y < Grid.Height; y++)
-//    {
-//        for (int x = 0; x < Grid.Width; x++)
-//        {
-//            int i = Idx(x, y);
-//            if (!IsBlackHole[i]) continue;
-
-//            for (int d = 0; d < 4; d++)
-//            {
-//                int nx = x + dx[d];
-//                int ny = y + dy[d];
-//                if (nx < 0 || nx >= Grid.Width || ny < 0 || ny >= Grid.Height)
-//                    continue;
-//                int ni = Idx(nx, ny);
-//                if (!IsBlackHole[ni])
-//                {
-//                    // Drain a fraction of neighbor's energy into the black hole
-//                    float absorbed = Nlocal[ni] * 0.2f; // 20% per tick, adjust as needed
-//                    Nlocal[ni] -= absorbed;
-//                    // Optionally, you can accumulate this in the black hole, or just let it vanish
-//                }
-//            }
-//        }
-//    }
-//}
-//void GrowBlackHoles(GridState s)
-//{
-//    bool[] nextBlackHole = (bool[])IsBlackHole.Clone();
-//    int[] dx = { 0, 0, -1, 1 };
-//    int[] dy = { -1, 1, 0, 0 };
-
-//    for (int y = 0; y < Grid.Height; y++)
-//    {
-//        for (int x = 0; x < Grid.Width; x++)
-//        {
-//            int i = Idx(x, y);
-//            if (!IsBlackHole[i]) continue;
-
-//            // For each neighbor, if it's not already a black hole but is adjacent to two or more black holes, convert it
-//            int blackHoleNeighbors = 0;
-//            for (int d = 0; d < 4; d++)
-//            {
-//                int nx = x + dx[d];
-//                int ny = y + dy[d];
-//                if (nx < 0 || nx >= Grid.Width || ny < 0 || ny >= Grid.Height)
-//                    continue;
-//                int ni = Idx(nx, ny);
-//                if (IsBlackHole[ni])
-//                    blackHoleNeighbors++;
-//            }
-
-//            // If a neighbor is not a black hole but is adjacent to two or more black holes, convert it
-//            for (int d = 0; d < 4; d++)
-//            {
-//                int nx = x + dx[d];
-//                int ny = y + dy[d];
-//                if (nx < 0 || nx >= Grid.Width || ny < 0 || ny >= Grid.Height)
-//                    continue;
-//                int ni = Idx(nx, ny);
-//                if (!IsBlackHole[ni])
-//                {
-//                    // If this neighbor is adjacent to at least two black holes, convert it
-//                    int neighborBlackHoles = 0;
-//                    for (int dd = 0; dd < 4; dd++)
-//                    {
-//                        int nnx = nx + dx[dd];
-//                        int nny = ny + dy[dd];
-//                        if (nnx < 0 || nnx >= Grid.Width || nny < 0 || nny >= Grid.Height)
-//                            continue;
-//                        int nni = Idx(nnx, nny);
-//                        if (IsBlackHole[nni])
-//                            neighborBlackHoles++;
-//                    }
-//                    if (neighborBlackHoles >= 2)
-//                        nextBlackHole[ni] = true;
-//                }
-//            }
-//        }
-//    }
-//    IsBlackHole = nextBlackHole;
-//}

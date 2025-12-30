@@ -559,7 +559,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5ef731d10db3bfa4a940839c7f979cfb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  simController: {fileID: 1095549187}
+  simController: {fileID: 0}
   OverlayPanel: {fileID: 1272684871}
   NGlobalMaxInput: {fileID: 0}
   NGlobalInput: {fileID: 0}
@@ -588,6 +588,7 @@ MonoBehaviour:
   PlayButton: {fileID: 1954426320}
   RestartButton: {fileID: 1433451701}
   PanelButton: {fileID: 1049705706}
+  ToggleTypeButton: {fileID: 0}
 --- !u!114 &269703904
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1978,7 +1979,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1095549189}
   - component: {fileID: 1095549188}
-  - component: {fileID: 1095549187}
+  - component: {fileID: 1095549190}
   m_Layer: 0
   m_Name: Simulation
   m_TagString: Untagged
@@ -1986,55 +1987,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1095549187
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1095549186}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5c3507d525883e04e80218d928e6e582, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  NGlobalMax: 50000000
-  NGlobal: 10000000
-  GlobalReplenishPerTick: 200
-  MinEnergyForPersistence: 5
-  EthreshBase: 0.18
-  GlobalScarcityK: 0.3
-  EntropyPenalty: 0.02
-  DecayLoss: 0.003
-  PropagateFrac: 0.25
-  MinBudgetToPropagate: 0.1
-  ActivationCost: 0.25
-  EntropyGainPerUse: 0.2
-  EntropyDiffuseRate: 0.2
-  EntropyDecay: 0.02
-  NlocalMax: 50000
-  VacuumEventProbability: 0.0002
-  VacuumEventEntropy: 0.5
-  ExpansionRate: 1
-  FieldAdvanceChance: 0.25
-  FieldAdvanceCost: 0.05
-  FieldAdvanceMinSource: 0.1
-  RequireViabilityForField: 0
-  SeedEnergyOnFieldAdvance: 1
-  FieldSeedEnergy: 0.1
-  VoidColor: {r: 0.05, g: 0.05, b: 0.08, a: 1}
-  ShowEntropyTint: 0
-  VacuumEnergyColor: {r: 0.48, g: 0.25, b: 0.52, a: 1}
-  NullspaceColor: {r: 0.15, g: 0, b: 0.25, a: 1}
-  ScaleFactor: 1
-  SpatialThreshK: -0.6
-  SpatialDecayK: 0.5
-  ticksPerSecond: 5
-  rNorm: []
-  FieldFirstTick: 
-  EnergyFirstTick: 
-  tick: 0
-  Grid: {fileID: 0}
 --- !u!114 &1095549188
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2066,6 +2018,59 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1095549190
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1095549186}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5c3507d525883e04e80218d928e6e582, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  NGlobalMax: 50000000
+  NGlobal: 10000000
+  GlobalReplenishPerTick: 200
+  MinEnergyForPersistence: 5
+  EthreshBase: 0.18
+  GlobalScarcityK: 0.3
+  EntropyPenalty: 0.02
+  DecayLoss: 0.003
+  EntropyViabilityGainA: 0.5
+  EntropyViabilityGainK: 1
+  PropagateFrac: 0.25
+  MinBudgetToPropagate: 0.1
+  ActivationCost: 0.25
+  EntropyGainPerUse: 0.2
+  EntropyDiffuseRate: 0.2
+  EntropyDecay: 0.02
+  EntropyGainFromGradient: 0.02
+  EntropyGainNearBH: 0.05
+  NlocalMax: 50000
+  VacuumEventProbability: 0.0002
+  VacuumEventEntropy: 0.5
+  ExpansionRate: 1
+  FieldAdvanceChance: 0.25
+  FieldAdvanceCost: 0.05
+  FieldAdvanceMinSource: 0.1
+  RequireViabilityForField: 0
+  SeedEnergyOnFieldAdvance: 1
+  FieldSeedEnergy: 0.1
+  VoidColor: {r: 0.05, g: 0.05, b: 0.08, a: 1}
+  ShowEntropyTint: 0
+  VacuumEnergyColor: {r: 0.48, g: 0.25, b: 0.52, a: 1}
+  NullspaceColor: {r: 0.15, g: 0, b: 0.25, a: 1}
+  ScaleFactor: 1
+  SpatialThreshK: -0.6
+  SpatialDecayK: 0.5
+  renderMode: 0
+  ticksPerSecond: 10
+  Grid: {fileID: 0}
+  BlackHoleFormThreshold: 0.5
+  BlackHoleDrainFrac: 0.05
+  BlackHoleRecoilFrac: 0
 --- !u!1 &1131274065
 GameObject:
   m_ObjectHideFlags: 0

@@ -3,6 +3,13 @@ using Assets.Scripts.Domain; // adjust if GridState/SimContext live elsewhere
 
 namespace Assets.Scripts.Unity
 {
+    public enum RenderMode
+    {
+        Viability,
+        Energy,
+        Entropy
+    }
+
     public sealed class GridRenderer
     {
         private readonly int _w;
@@ -38,15 +45,21 @@ namespace Assets.Scripts.Unity
         /// - Field but not viable: dim field colour
         /// - Vacuum: dim field colour (or special colour if you prefer)
         /// </summary>
-        public void Render(GridState s, SimContext ctx)
+        public void Render(GridState s, SimContext ctx, RenderMode mode)
         {
-            // Compute per-frame viability max (positive values only)
+            // Compute per-frame maxima
             float vMax = 0f;
+            float eMax = 0f;
+            float entropyMax = 0f;
             for (int i = 0; i < s.V.Length; i++)
             {
                 if (s.V[i] > vMax) vMax = s.V[i];
+                if (s.Nlocal[i] > eMax) eMax = s.Nlocal[i];
+                if (s.Entropy[i] > entropyMax) entropyMax = s.Entropy[i];
             }
             float invVmax = vMax > 0f ? 1f / vMax : 0f;
+            float invEmax = eMax > 0f ? 1f / eMax : 0f;
+            float invEntropyMax = entropyMax > 0f ? 1f / entropyMax : 0f;
 
             for (int y = 0; y < _h; y++)
             {
@@ -89,31 +102,46 @@ namespace Assets.Scripts.Unity
                         continue;
                     }
 
-                    //// Persist yellow once the field has ever arrived
-                    //if (s.FieldPresent[i] && s.FieldFirstTick[i] >= 0)
-                    //{
-                    //    vis.SetColor(Color.yellow);
-                    //    continue;
-                    //}
-
                     if (s.IsVacuum[i])
                     {
                         vis.SetColor(_fieldDimColor);
                         continue;
                     }
 
-                    if (s.Active[i] == 1 && s.V[i] > 0f)
+                    switch (mode)
                     {
-                        float vNorm = Mathf.Clamp01(s.V[i] * invVmax); // per-frame normalization
-                        if (ShowEntropyTint)
-                            vis.SetViabilityWithEntropy(vNorm, s.Entropy[i]);
-                        else
-                            vis.SetViability(vNorm);
-                        continue;
+                        case RenderMode.Energy:
+                            {
+                                float eNorm = Mathf.Clamp01(s.Nlocal[i] * invEmax);
+                                Color energyColor = Color.Lerp(_fieldDimColor, Color.red, eNorm);
+                                vis.SetColor(energyColor);
+                                break;
+                            }
+                        case RenderMode.Entropy:
+                            {
+                                float entropyNorm = Mathf.Clamp01(s.Entropy[i] * invEntropyMax);
+                                Color entropyColor = Color.Lerp(Color.blue, Color.magenta, entropyNorm);
+                                vis.SetColor(entropyColor);
+                                break;
+                            }
+                        default:
+                            {
+                                if (s.Active[i] == 1 && s.V[i] > 0f)
+                                {
+                                    float vNorm = Mathf.Clamp01(s.V[i] * invVmax); // per-frame normalization
+                                    if (ShowEntropyTint)
+                                        vis.SetViabilityWithEntropy(vNorm, s.Entropy[i]);
+                                    else
+                                        vis.SetViability(vNorm);
+                                }
+                                else
+                                {
+                                    // Field present but not viable/active
+                                    vis.SetColor(_fieldDimColor);
+                                }
+                                break;
+                            }
                     }
-
-                    // Field present but not viable/active
-                    vis.SetColor(_fieldDimColor);
                 }
             }
         }

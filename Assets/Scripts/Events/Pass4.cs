@@ -21,7 +21,8 @@ namespace Assets.Scripts.Events
         public static void EntropyDiffuse(
             int width, int height,
             float[] Entropy, float[] entropyNext,
-            float EntropyDiffuseRate, float EntropyDecay)
+            float EntropyDiffuseRate, float EntropyDecay,
+            bool[] IsBlackHole)
         {
             int Idx(int x, int y) => y * width + x;
 
@@ -31,11 +32,17 @@ namespace Assets.Scripts.Events
                 {
                     int i = Idx(x, y);
 
+                    if (IsBlackHole[i])
+                    {
+                        entropyNext[i] = 1f;
+                        continue;
+                    }
+
                     float c = Entropy[i];
-                    float n = (y > 0) ? Entropy[i - width] : c;
-                    float s = (y < height - 1) ? Entropy[i + width] : c;
-                    float w = (x > 0) ? Entropy[i - 1] : c;
-                    float e = (x < width - 1) ? Entropy[i + 1] : c;
+                    float n = (y > 0 && !IsBlackHole[i - width]) ? Entropy[i - width] : c;
+                    float s = (y < height - 1 && !IsBlackHole[i + width]) ? Entropy[i + width] : c;
+                    float w = (x > 0 && !IsBlackHole[i - 1]) ? Entropy[i - 1] : c;
+                    float e = (x < width - 1 && !IsBlackHole[i + 1]) ? Entropy[i + 1] : c;
 
                     float lap = (n + s + w + e - 4f * c);
                     float diffused = c + EntropyDiffuseRate * lap;

@@ -45,23 +45,11 @@ public class SimulationUIController : MonoBehaviour
     public Button PlayButton;
     public Button RestartButton;
     public Button PanelButton;
+    public Button ToggleTypeButton;
 
     void Start()
     {
-        // Helper to add float input listeners
-        void AddFloatInputListener(TMP_InputField input, Action<float> setter, string format = "G", float min = 0.0001f)
-        {
-            input.onEndEdit.AddListener(val =>
-            {
-                if (float.TryParse(val, out float result))
-                {
-                    float clamped = Mathf.Max(min, result);
-                    setter(clamped);
-                    input.text = clamped.ToString(format);
-                }
-            });
-        }
-
+             
         // Controls
 
         // Play Button
@@ -76,7 +64,12 @@ public class SimulationUIController : MonoBehaviour
         // Restart Button
         RestartButton.onClick.AddListener(() => simController.RestartSimulation());
 
+
         PanelButton.onClick.AddListener(TogglePanel);
+        
+        
+
+
         OverlayPanel.SetActive(true);
     }
 
