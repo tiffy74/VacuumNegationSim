@@ -38,17 +38,15 @@ namespace Assets.Scripts.Events
                 {
                     int i = Idx(x, y);
 
-                    // ---- BLACK HOLE: hard boundary / static marker ----
-                    // Do NOT allow normal energy/entropy/viability evolution inside.
-                    // Keep them "dead" cells (or whatever you want to render as BH).
+                    // ---- BLACK HOLE: collapsed configuration space ----
+                    // These are stable geometric constraints, NOT energy drains.
+                    // Energy cannot exist here (no valid configuration).
                     if (IsBlackHole[i])
                     {
                         Nlocal[i] = 0f;
-                        Entropy[i] = 1f;
+                        Entropy[i] = 1f; // maximum entropy (collapsed)
                         V[i] = 0f;
                         Active[i] = 0;
-
-                        // ensure no accumulation inside
                         incoming[i] = 0f;
                         continue;
                     }
@@ -146,48 +144,14 @@ namespace Assets.Scripts.Events
                         V[i] = 0f;
                         continue;
                     }
-                    int blocked = 0;
-                    float bhConsumption = 0f;
-                    const float BH_CONSUMPTION_RATE = 0.05f; // Energy consumed per adjacent BH per tick
-
-                    if (x > 0 && IsBlackHole[i - 1]) 
-                    { 
-                        blocked++; 
-                        bhConsumption += BH_CONSUMPTION_RATE;
-                    }
-                    if (x < width - 1 && IsBlackHole[i + 1]) 
-                    { 
-                        blocked++; 
-                        bhConsumption += BH_CONSUMPTION_RATE;
-                    }
-                    if (y > 0 && IsBlackHole[i - width]) 
-                    { 
-                        blocked++; 
-                        bhConsumption += BH_CONSUMPTION_RATE;
-                    }
-                    if (y < height - 1 && IsBlackHole[i + width]) 
-                    { 
-                        blocked++; 
-                        bhConsumption += BH_CONSUMPTION_RATE;
-                    }
-
-                    // Apply BH consumption BEFORE viability calculation
-                    if (bhConsumption > 0f && Nlocal[i] > 0f)
-                    {
-                        float consumed = Mathf.Min(Nlocal[i] * bhConsumption, Nlocal[i]);
-                        Nlocal[i] -= consumed;
-                        
-                        // Optional: feed consumed energy to global pool or BH mass
-                        // NGlobal += consumed * 0.1f; // Some energy returns to global pool
-                    }
 
                     // ---- VIABILITY ----
                     // Compute viability from inflow, current energy, and entropy.
                     // If you want entropy to BOOST viability (your conceptual preference),
                     // encode that inside ComputeViability, not here, to keep the system clean.
-                    float constraintBoost = 1f + 0.25f * blocked;
+                    float constraintBoost = 1f;
                     V[i] = ComputeViability(inFlow * constraintBoost, Nlocal[i], Entropy[i]);
-                    Debug.Log($"[Blocked: {blocked}");
+                    
                     // ---- ACTIVE STATE ----
                     // Your current practice: active if viable enough and sufficient energy.
                     if (V[i] > 0f && Nlocal[i] > MinBudgetToPropagate)

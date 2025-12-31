@@ -1,16 +1,18 @@
 ﻿using UnityEngine;
-using Assets.Scripts.Domain; // adjust if your GridState/SimContext live elsewhere
+using Assets.Scripts.Domain;
 
 namespace Assets.Scripts.Events
 {
     public static class FieldWave
     {
         /// <summary>
-        /// Energy-coupled field propagation.
-        /// A field cell can create field in a neighbor only by paying FieldAdvanceCost from its Nlocal.
-        /// Optionally requires the source neighbor to be viable.
-        ///
-        /// This prevents the field/geometry front from racing far ahead of the energy wave.
+        /// Configuration space (FieldPresent) exists ONLY at the boundary between energy field and void.
+        /// This is where possibilities/propagation paths exist.
+        /// 
+        /// Rule: A void cell becomes configuration space if:
+        /// 1. It is NOT black hole
+        /// 2. It is adjacent to at least one energy field cell
+        /// 3. It is adjacent to void (the "leading edge")
         /// </summary>
         public static void PropagateFieldWave(
             GridState s,
@@ -33,11 +35,38 @@ namespace Assets.Scripts.Events
                 {
                     int i = s.Idx(x, y);
 
-                    if (s.FieldPresent[i]) continue;     // already has field
-                    if (s.IsBlackHole[i]) continue;      // optional: BH blocks field
-                    if (s.IsVacuum[i]) continue;         // optional: vacuum blocks field
+                    // Skip if already has field or is a black hole
+                    if (s.FieldPresent[i]) continue;
+                    if (s.IsBlackHole[i]) continue;
 
-                    // Look for any neighbor with field that can "pay" to expand
+                    // Configuration space can only form at the boundary:
+                    // Must be adjacent to both existing field AND void
+                    bool adjacentToField = false;
+                    bool adjacentToVoid = false;
+
+                    for (int d = 0; d < 4; d++)
+                    {
+                        int nx = x + dx[d];
+                        int ny = y + dy[d];
+                        if (nx < 0 || nx >= s.W || ny < 0 || ny >= s.H)
+                        {
+                            adjacentToVoid = true; // grid edge counts as void
+                            continue;
+                        }
+
+                        int ni = s.Idx(nx, ny);
+                        
+                        if (s.FieldPresent[ni])
+                            adjacentToField = true;
+                        else if (!s.IsBlackHole[ni])
+                            adjacentToVoid = true;
+                    }
+
+                    // Only create config space at the boundary
+                    if (!adjacentToField || !adjacentToVoid)
+                        continue;
+
+                    // Now check if a neighboring field cell can pay to expand
                     for (int d = 0; d < 4; d++)
                     {
                         int nx = x + dx[d];
@@ -47,32 +76,28 @@ namespace Assets.Scripts.Events
                         int ni = s.Idx(nx, ny);
                         if (!s.FieldPresent[ni]) continue;
 
-                        // Optional: require source neighbor to be viable & active
-                        if (requireViability)
-                        {
-                            if (!(s.V[ni] > 0f && s.Active[ni] == 1))
-                                continue;
-                        }
+                        // Optional: require source to be viable
+                        if (requireViability && !(s.V[ni] > 0f && s.Active[ni] == 1))
+                            continue;
 
-                        // Must have enough energy to advance field
+                        // Must have enough energy
                         if (s.Nlocal[ni] < fieldAdvanceMinSource)
                             continue;
 
-                        // Chance gate
+                        // Probabilistic expansion
                         if (Random.value > fieldAdvanceChance)
                             continue;
 
-                        // Pay energy
+                        // Pay energy cost
                         s.Nlocal[ni] = Mathf.Max(0f, s.Nlocal[ni] - fieldAdvanceCost);
 
-                        // Create field
+                        // Create configuration space
                         nextField[i] = true;
 
-                        // mark arrival tick (used by renderer to show thin yellow ring)
                         if (s.FieldFirstTick[i] == -1)
                             s.FieldFirstTick[i] = tick;
 
-                        // Optional: seed minimal energy so energy doesn't lag absurdly
+                        // Optional: seed minimal energy
                         if (seedEnergyOnAdvance)
                             s.Nlocal[i] = Mathf.Max(s.Nlocal[i], seedEnergy);
 

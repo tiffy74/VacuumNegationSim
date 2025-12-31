@@ -46,6 +46,7 @@ public class SimulationUIController : MonoBehaviour
     public Button RestartButton;
     public Button PanelButton;
     public Button ToggleTypeButton;
+    public Button ExitButton;
 
     void Start()
     {
@@ -64,6 +65,8 @@ public class SimulationUIController : MonoBehaviour
         // Restart Button
         RestartButton.onClick.AddListener(() => simController.RestartSimulation());
 
+        // Exit Button
+        ExitButton.onClick.AddListener(() => ExitApplication()); // Add this 
 
         PanelButton.onClick.AddListener(TogglePanel);
         

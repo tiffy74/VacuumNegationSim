@@ -132,7 +132,29 @@ namespace Assets.Scripts.Events
 
             // FIRST: Calculate black hole attraction weights for each cell
             float[] bhAttractionWeight = new float[width * height];
-            
+            for (int py = 0; py < height; py++)
+            {
+                for (int px = 0; px < width; px++)
+                {
+                    int pi = Idx(px, py);
+                    if (!FieldPresent[pi]) continue;
+                    
+                    // Count adjacent black holes
+                    int adjacentBH = 0;
+                    for (int d = 0; d < 4; d++)
+                    {
+                        int nx = px + dx[d];
+                        int ny = py + dy[d];
+                        if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
+                        int nIdx = Idx(nx, ny);
+                        if (IsBlackHole[nIdx]) adjacentBH++;
+                    }
+                    
+                    // Cells next to BH have strong attraction bias (more BH neighbors = stronger)
+                    bhAttractionWeight[pi] = adjacentBH > 0 ? 1f + (adjacentBH * 0.5f) : 0f;
+                }
+            }
+
             for (int y = 0; y < height; y++)
             {
                 for (int x = 0; x < width; x++)
@@ -148,71 +170,141 @@ namespace Assets.Scripts.Events
                     float available = Nlocal[i] * frac;
                     if (available <= 0f) continue;
 
-                    float portion = available * 0.25f;
-                    int sentCount = 0;
-                    float sentTotal = 0f; // <-- Declare sentTotal before use
-                    float wouldHaveSentIntoNoConfig = 0f;
-                    // Count adjacent black holes
-                    int adjacentBH = 0;
+                    // Calculate weighted distribution based on BH attraction
+                    float[] weights = new float[4];
+                    int[] neighborIndices = new int[4];
+                    bool[] isBoundaryVoid = new bool[4];
+                    bool[] isBlackHoleNeighbor = new bool[4];
+                    float totalWeight = 0f;
+                    int validNeighbors = 0;
+
                     for (int d = 0; d < 4; d++)
                     {
                         int nx = x + dx[d];
                         int ny = y + dy[d];
-                        if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
-                        int nIdx = Idx(nx, ny);
-                        int neighborIdx = Idx(nx, ny);
-                        if (IsBlackHole[nIdx]) adjacentBH++;
-                        if (IsVacuum[neighborIdx]) continue;
+                        if (nx < 0 || nx >= width || ny < 0 || ny >= height)
+                        {
+                            weights[d] = 0f;
+                            isBoundaryVoid[d] = false;
+                            isBlackHoleNeighbor[d] = false;
+                            continue;
+                        }
 
-                        // Hard wall: BH blocks transfer
+                        int neighborIdx = Idx(nx, ny);
+                        neighborIndices[d] = neighborIdx;
+
+                        // Skip vacuum
+                        if (IsVacuum[neighborIdx])
+                        {
+                            weights[d] = 0f;
+                            isBoundaryVoid[d] = false;
+                            isBlackHoleNeighbor[d] = false;
+                            continue;
+                        }
+
+                        // Black hole neighbor: mark but don't transfer
                         if (IsBlackHole[neighborIdx])
                         {
-                            wouldHaveSentIntoNoConfig += portion;
+                            weights[d] = 0f;
+                            isBoundaryVoid[d] = false;
+                            isBlackHoleNeighbor[d] = true;
                             continue;
                         }
-                        ;
 
-                        // Successful transfer inside geometry
+                        // Field-present neighbors: apply BH attraction weighting
                         if (FieldPresent[neighborIdx])
                         {
-                            incoming[neighborIdx] += portion;
-                            sentTotal += portion;               // <-- only successful sends spend energy
-                            continue;
+                            // Base weight = 1.0, boost if neighbor is adjacent to BH
+                            weights[d] = 1f + bhAttractionWeight[neighborIdx];
+                            totalWeight += weights[d];
+                            validNeighbors++;
+                            isBoundaryVoid[d] = false;
+                            isBlackHoleNeighbor[d] = false;
                         }
-                        else 
+                        // Boundary void: potential BH formation site
+                        else if (IsBoundaryVoid(neighborIdx, width, height, FieldPresent))
                         {
-                            if (!IsBlackHole[neighborIdx])
-                            {
-                                boundaryHitsThisTick++;
-                                BlackHoleCharge[neighborIdx] += portion;
-                                maxChargeThisTick = Mathf.Max(maxChargeThisTick, BlackHoleCharge[neighborIdx]);
-
-                                // Do NOT allow BH formation in first few ticks (prevents seed getting punched out)
-                                bool allowBH = tick >= 10;
-
-                                // Require accumulation across multiple hits
-                                bool shouldCreate = allowBH && BlackHoleCharge[neighborIdx] >= blackHoleThreshold;
-                                if (shouldCreate)
-                                {
-                                    BlackHoles.AssignOrMergeAtCell(
-                                        neighborIdx, width, height,
-                                        IsBlackHole, BlackHoleId, BlackHoleParent, BlackHoleMass, ref NextBlackHoleId);
-                                    BlackHoleCharge[neighborIdx] = 0f;
-                                    newBhCount++;
-                                    if (debugForceBHOnFirstBoundaryHit)
-                                        debugForceBHOnFirstBoundaryHit = false; // only first hit
-                                }
-                            }
-                            // No transfer into void; accumulation occurs on the source side
-                            wouldHaveSentIntoNoConfig += portion;
+                            weights[d] = 0f;
+                            isBoundaryVoid[d] = true;
+                            isBlackHoleNeighbor[d] = false;
+                        }
+                        else
+                        {
+                            weights[d] = 0f;
+                            isBoundaryVoid[d] = false;
+                            isBlackHoleNeighbor[d] = false;
                         }
                     }
-                    // Cells next to BH have strong attraction bias (more BH neighbors = stronger)
-                    bhAttractionWeight[i] = adjacentBH > 0 ? 1f + (adjacentBH * 0.5f) : 0f;
-                    // float sentTotal = portion * sentCount;
+
+                    float sentTotal = 0f;
+                    float wouldHaveSentIntoNoConfig = 0f;
+
+                    // PART 1: Distribute to field-present neighbors (with BH attraction)
+                    if (validNeighbors > 0)
+                    {
+                        for (int d = 0; d < 4; d++)
+                        {
+                            if (weights[d] <= 0f) continue;
+
+                            // Proportional distribution based on BH attraction weights
+                            float portion = available * (weights[d] / totalWeight);
+                            int neighborIdx = neighborIndices[d];
+
+                            incoming[neighborIdx] += portion;
+                            sentTotal += portion;
+                        }
+                    }
+
+                    // PART 2: Handle boundary void leakage (creates black holes after tick 10)
+                    for (int d = 0; d < 4; d++)
+                    {
+                        if (!isBoundaryVoid[d]) continue;
+
+                        int neighborIdx = neighborIndices[d];
+
+                        // Energy leaking to boundary void charges black hole formation
+                        float leakPortion = available * 0.25f;
+                        BlackHoleCharge[neighborIdx] += leakPortion;
+                        boundaryHitsThisTick++;
+
+                        maxChargeThisTick = Mathf.Max(maxChargeThisTick, BlackHoleCharge[neighborIdx]);
+
+                        // CRITICAL: Do NOT allow BH formation before tick 10 (prevents seed destruction)
+                        bool allowBH = tick >= 10;
+
+                        // Require both: sufficient time elapsed AND threshold reached
+                        bool shouldCreate = allowBH && (BlackHoleCharge[neighborIdx] >= blackHoleThreshold || debugForceBHOnFirstBoundaryHit);
+                        if (shouldCreate)
+                        {
+                            BlackHoles.AssignOrMergeAtCell(
+                                neighborIdx, width, height,
+                                IsBlackHole, BlackHoleId, BlackHoleParent, BlackHoleMass, ref NextBlackHoleId);
+                            BlackHoleCharge[neighborIdx] = 0f;
+                            newBhCount++;
+                            Debug.Log($"BH created at ({neighborIdx % width}, {neighborIdx / width}) tick={tick} charge reset");
+
+                            if (debugForceBHOnFirstBoundaryHit)
+                                debugForceBHOnFirstBoundaryHit = false;
+                        }
+
+                        // No actual transfer; energy stays at source
+                        wouldHaveSentIntoNoConfig += leakPortion;
+                    }
+
+                    // PART 3: Handle blocked BH neighbors (energy reflects back)
+                    for (int d = 0; d < 4; d++)
+                    {
+                        if (!isBlackHoleNeighbor[d]) continue;
+
+                        float blockedPortion = available * 0.25f;
+                        wouldHaveSentIntoNoConfig += blockedPortion;
+                    }
+
+                    // Deduct successfully transferred energy
                     if (sentTotal > 0f)
                         Nlocal[i] = Mathf.Max(0f, Nlocal[i] - sentTotal);
-                    // Accumulate build-up pressure locally (this is your “stable dependency” effect)
+
+                    // Accumulate blocked/leaked energy back to source (creates pressure buildup)
                     if (wouldHaveSentIntoNoConfig > 0f)
                         incoming[i] += wouldHaveSentIntoNoConfig;
                 }
