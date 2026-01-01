@@ -131,6 +131,7 @@ namespace Assets.Scripts.Events
             int[] dy = { -1, 1, 0, 0 };
 
             // FIRST: Calculate black hole attraction weights for each cell
+            // This now considers the TOTAL MASS of merged black holes
             float[] bhAttractionWeight = new float[width * height];
             for (int py = 0; py < height; py++)
             {
@@ -139,19 +140,38 @@ namespace Assets.Scripts.Events
                     int pi = Idx(px, py);
                     if (!FieldPresent[pi]) continue;
                     
-                    // Count adjacent black holes
-                    int adjacentBH = 0;
+                    // Sum the influence of ALL adjacent black holes (by their root mass)
+                    float totalBHInfluence = 0f;
+                    
                     for (int d = 0; d < 4; d++)
                     {
                         int nx = px + dx[d];
                         int ny = py + dy[d];
                         if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
                         int nIdx = Idx(nx, ny);
-                        if (IsBlackHole[nIdx]) adjacentBH++;
+                        
+                        if (IsBlackHole[nIdx])
+                        {
+                            // Get the ROOT of this BH (handles merged BHs)
+                            int root = BlackHoles.GetRootAtCell(nIdx, BlackHoleId, BlackHoleParent);
+                            
+                            // Get the total mass of this merged BH
+                            float bhMass = 1f; // Default mass
+                            if (root > 0 && root < BlackHoleMass.Length)
+                                bhMass = Mathf.Max(1f, BlackHoleMass[root]);
+                            
+                            // Influence scales with mass (like gravitational force ∝ M)
+                            // Larger merged BHs have stronger pull
+                            totalBHInfluence += bhMass;
+                        }
                     }
-                    
-                    // Cells next to BH have strong attraction bias (more BH neighbors = stronger)
-                    bhAttractionWeight[pi] = adjacentBH > 0 ? 1f + (adjacentBH * 0.5f) : 0f;
+            
+                    // Attraction weight: base 1.0 + mass-weighted influence
+                    // Scale factor 0.1 to keep weights reasonable (tune as needed)
+                    if (totalBHInfluence > 0f)
+                        bhAttractionWeight[pi] = 1f + (totalBHInfluence * 0.1f);
+                    else
+                        bhAttractionWeight[pi] = 0f;
                 }
             }
 
@@ -211,10 +231,10 @@ namespace Assets.Scripts.Events
                             continue;
                         }
 
-                        // Field-present neighbors: apply BH attraction weighting
+                        // Field-present neighbors: apply mass-weighted BH attraction
                         if (FieldPresent[neighborIdx])
                         {
-                            // Base weight = 1.0, boost if neighbor is adjacent to BH
+                            // Base weight = 1.0, boost by mass-weighted BH influence
                             weights[d] = 1f + bhAttractionWeight[neighborIdx];
                             totalWeight += weights[d];
                             validNeighbors++;
@@ -239,14 +259,14 @@ namespace Assets.Scripts.Events
                     float sentTotal = 0f;
                     float wouldHaveSentIntoNoConfig = 0f;
 
-                    // PART 1: Distribute to field-present neighbors (with BH attraction)
+                    // PART 1: Distribute to field-present neighbors (with mass-weighted BH attraction)
                     if (validNeighbors > 0)
                     {
                         for (int d = 0; d < 4; d++)
                         {
                             if (weights[d] <= 0f) continue;
 
-                            // Proportional distribution based on BH attraction weights
+                            // Proportional distribution based on mass-weighted BH attraction
                             float portion = available * (weights[d] / totalWeight);
                             int neighborIdx = neighborIndices[d];
 
@@ -276,12 +296,21 @@ namespace Assets.Scripts.Events
                         bool shouldCreate = allowBH && (BlackHoleCharge[neighborIdx] >= blackHoleThreshold || debugForceBHOnFirstBoundaryHit);
                         if (shouldCreate)
                         {
-                            BlackHoles.AssignOrMergeAtCell(
+                            // This automatically merges with adjacent BHs via union-find
+                            int bhRoot = BlackHoles.AssignOrMergeAtCell(
                                 neighborIdx, width, height,
                                 IsBlackHole, BlackHoleId, BlackHoleParent, BlackHoleMass, ref NextBlackHoleId);
+                            
                             BlackHoleCharge[neighborIdx] = 0f;
                             newBhCount++;
-                            Debug.Log($"BH created at ({neighborIdx % width}, {neighborIdx / width}) tick={tick} charge reset");
+                            
+                            // Get the total mass of the (possibly merged) BH
+                            float totalMass = 1f;
+                            if (bhRoot > 0 && bhRoot < BlackHoleMass.Length)
+                                totalMass = BlackHoleMass[bhRoot];
+                            
+
+                            Debug.Log($"BH created/merged at ({neighborIdx % width}, {neighborIdx / width}) tick={tick}, root={bhRoot}, totalMass={totalMass:F2}");
 
                             if (debugForceBHOnFirstBoundaryHit)
                                 debugForceBHOnFirstBoundaryHit = false;

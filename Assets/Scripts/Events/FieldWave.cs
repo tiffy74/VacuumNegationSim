@@ -6,13 +6,8 @@ namespace Assets.Scripts.Events
     public static class FieldWave
     {
         /// <summary>
-        /// Configuration space (FieldPresent) exists ONLY at the boundary between energy field and void.
-        /// This is where possibilities/propagation paths exist.
-        /// 
-        /// Rule: A void cell becomes configuration space if:
-        /// 1. It is NOT black hole
-        /// 2. It is adjacent to at least one energy field cell
-        /// 3. It is adjacent to void (the "leading edge")
+        /// Configuration space pervades everywhere but is only observable at boundaries.
+        /// Maintains configuration space around black holes (event horizons) and at the energy front.
         /// </summary>
         public static void PropagateFieldWave(
             GridState s,
@@ -35,14 +30,50 @@ namespace Assets.Scripts.Events
                 {
                     int i = s.Idx(x, y);
 
-                    // Skip if already has field or is a black hole
-                    if (s.FieldPresent[i]) continue;
-                    if (s.IsBlackHole[i]) continue;
+                    // Black holes themselves never have FieldPresent
+                    if (s.IsBlackHole[i])
+                    {
+                        nextField[i] = false;
+                        continue;
+                    }
 
-                    // Configuration space can only form at the boundary:
-                    // Must be adjacent to both existing field AND void
+                    // If cell already has field, check if it should keep it
+                    if (s.FieldPresent[i])
+                    {
+                        // Keep field if:
+                        // 1. It has energy, OR
+                        // 2. It's adjacent to a black hole (event horizon boundary), OR
+                        // 3. It's adjacent to another field cell
+                        bool shouldKeepField = s.Nlocal[i] > 0f;
+                        
+                        if (!shouldKeepField)
+                        {
+                            for (int d = 0; d < 4; d++)
+                            {
+                                int nx = x + dx[d];
+                                int ny = y + dy[d];
+                                if (nx < 0 || nx >= s.W || ny < 0 || ny >= s.H) continue;
+                                int ni = s.Idx(nx, ny);
+                                
+                                // Keep field if adjacent to BH (event horizon) or another field cell
+                                if (s.IsBlackHole[ni] || s.FieldPresent[ni])
+                                {
+                                    shouldKeepField = true;
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        if (!shouldKeepField)
+                            nextField[i] = false; // Allow field to decay if isolated
+                        
+                        continue; // Don't try to re-create field that already exists
+                    }
+
+                    // From here: cell doesn't have field yet
+                    // Configuration space forms at boundaries (field-void interface)
                     bool adjacentToField = false;
-                    bool adjacentToVoid = false;
+                    bool adjacentToVoidOrBH = false;
 
                     for (int d = 0; d < 4; d++)
                     {
@@ -50,7 +81,7 @@ namespace Assets.Scripts.Events
                         int ny = y + dy[d];
                         if (nx < 0 || nx >= s.W || ny < 0 || ny >= s.H)
                         {
-                            adjacentToVoid = true; // grid edge counts as void
+                            adjacentToVoidOrBH = true;
                             continue;
                         }
 
@@ -58,12 +89,12 @@ namespace Assets.Scripts.Events
                         
                         if (s.FieldPresent[ni])
                             adjacentToField = true;
-                        else if (!s.IsBlackHole[ni])
-                            adjacentToVoid = true;
+                        else if (!s.FieldPresent[ni]) // Void or BH
+                            adjacentToVoidOrBH = true;
                     }
 
                     // Only create config space at the boundary
-                    if (!adjacentToField || !adjacentToVoid)
+                    if (!adjacentToField || !adjacentToVoidOrBH)
                         continue;
 
                     // Now check if a neighboring field cell can pay to expand

@@ -128,14 +128,30 @@ namespace Assets.Scripts.Events
                         if (count >= 2)
                         {
                             next[ni] = true;
-                            if (!next[ni])
-                                Debug.LogError($"BH formation failed at {ni} charge={s.BlackHoleCharge[ni]}");
+                            //if (!next[ni])
+                            //    Debug.LogError($"BH formation failed at {ni} charge={s.BlackHoleCharge[ni]}");
                         }
                     }
                 }
             }
 
             s.IsBlackHole = next;
+
+            for (int y = 0; y < s.H; y++)
+            {
+                for (int x = 0; x < s.W; x++)
+                {
+                    int i = s.Idx(x, y);
+
+                    // If this is a BH cell without an ID (newly grown), assign/merge it
+                    if (s.IsBlackHole[i] && s.BlackHoleId[i] == 0)
+                    {
+                        AssignOrMergeAtCell(i, s.W, s.H,
+                            s.IsBlackHole, s.BlackHoleId, s.BlackHoleParent, s.BlackHoleMass,
+                            ref s.NextBlackHoleId);
+                    }
+                }
+            }
         }
         public static int Find(int id, int[] parent)
         {
