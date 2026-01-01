@@ -1,100 +1,71 @@
 # Vacuum Negation Simulator
 
-**A Unity-based simulation of the theoretical framework _Energy as Vacuum Negation_.**  
-This project visualizes how structure, energy, and persistence emerge from an infinite true vacuum — not through design, but through thermodynamic viability conditions.
+**A Unity-based simulation exploring emergent spacetime geometry, black hole formation, and energy propagation through configuration space.**
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Unity Version](https://img.shields.io/badge/Unity-2022%2B-blue.svg)](https://unity.com/)
+[![.NET](https://img.shields.io/badge/.NET%20Framework-4.7.1-purple.svg)](https://dotnet.microsoft.com/)
 
 ---
 
 ## 🧠 Conceptual Overview
 
-This simulation explores the idea that:
+This simulation tests a theoretical framework where:
 
-- **The true vacuum** is an infinite, geometry-less state with maximum entropy and perfect symmetry.
-- **Negation** is the emergence of structure from this nullstate — measured by deviation from entropy and symmetry.
-- **Energy** is not a substance, but the **thermodynamic cost of persisting structure**.
-- **Persistence** is governed by a viability equation:
+- **Configuration Space** is a fundamental substrate that pervades everywhere (analogous to spacetime in General Relativity)
+- **Energy** propagates through active configuration space, creating observable field structures
+- **Black Holes** represent regions where configuration space has collapsed—energy cannot exist there
+- **Stable Dependencies** form when energy encounters geometric constraints, creating pressure buildups (visible as "halos")
+- **Emergence** drives the formation of complex structures through local thermodynamic rules, not top-down design
 
-- - **Negation clusters (e.g., black holes)** can become over-viable, causing inflationary propagation into the surrounding vacuum.
-- **Negation cannot propagate infinitely**; it thins out, eventually reverting to vacuum — naturally creating pockets of persistent structure and voids.
-- **Persistent structures act as attractors**, increasing local viability and enabling further structure formation.
+### Physical Analogies
 
----
-
-## 🎯 Simulation Goals
-
-- Demonstrate structure emerging **spontaneously** from overcompensated negation.
-- Simulate **self-terminating inflation**, not through explicit boundaries but through natural viability failure.
-- Show how **pockets of persistent negation** act as **viability attractors**.
-- Let **voids re-form naturally** where viability falls below threshold.
-- Provide a **modular framework** for theoretical experimentation and visual education.
+| **Your Framework** | **General Relativity Analogue** | **Implementation** |
+|-------------------|--------------------------------|-------------------|
+| Configuration Space | Spacetime manifold | `FieldPresent[i]` boolean array |
+| Energy Field | Matter/energy distribution | `Nlocal[i]` float array |
+| Black Holes | Event horizons (collapsed geometry) | `IsBlackHole[i]` boolean array |
+| Mass-weighted attraction | Gravitational force ∝ M | `bhAttractionWeight` in Pass1 |
+| Viability | Thermodynamic persistence criterion | `V[i]` computed each tick |
+| Entropy | Information-theoretic complexity | `Entropy[i]` from config count + gradients |
 
 ---
 
-## 🗂️ Core Modules
+## 🎯 What You'll See
 
-### 1. Simulation Grid Manager
-- Manages a 2D (or optional 3D) array of `Cells`.
-- Each cell holds:
-- `bool IsVacuum`
-- `float Entropy`
-- `float Symmetry`
-- `float Energy`
-- `float Viability`
-- `bool IsNegationSource`
-- `List<Cell> Neighbors`
+When you run the simulation:
 
-### 2. Negation Engine
-- Computes viability `V(C, t)` per cell.
-- Applies viability rules:
-- If `V > 1`: structure persists/emerges.
-- If `V < 1`: structure collapses (returns to vacuum).
-- Factors:
-- `E_in`: influenced by nearby structures.
-- `E_loss`: entropy, distance, dissipation.
-- `E_thresh`: minimum energy needed to persist.
+1. **Initial Seed** (tick 0-10): Small central energy patch (bright white) establishes itself
+2. **Field Expansion** (tick 10+): Yellow boundaries propagate outward as configuration space activates
+3. **Black Hole Formation** (tick 10+): Magenta regions appear where energy leaks into void without config space
+4. **Stable Halos**: Bright regions form around black holes as energy accumulates (cannot propagate into collapsed space)
+5. **Merging**: Adjacent black holes combine into single entities with increased mass/influence
 
-### 3. Entropy Manager
-- Modifies local entropy based on:
-- Neighboring structure presence/absence.
-- Environmental noise.
-- Collapse events (increase local entropy).
+### Color Legend
 
-### 4. Negation Propagation System
-- Spreads negation to viable neighbors.
-- No hardcoded range — viability governs spread.
-- Decay handled naturally through entropy and distance.
+- 🟪 **Dark Purple/Black**: Void (no configuration space, no energy)
+- 🟨 **Yellow**: Configuration space boundary (field active but low energy)
+- ⬜ **White/Bright**: High-energy regions (active field with abundant energy)
+- 🟣 **Magenta**: Black holes (collapsed configuration space)
+- 🔵 **Blue tint**: Entropy visualization (when enabled)
 
-### 5. Attractor Field System
-- Persistent negation emits viability bias.
-- Affects neighbor cells’ `E_in`, `Entropy`, or `E_thresh`.
-- Can result in:
-- Cluster formation.
-- Structure chain reactions.
-- Void reinforcement when bias is absent.
+---
 
-### 6. Inflation Trigger
-- Special initial configuration with:
-- Extremely high `E_in`
-- Low `Entropy`
-- High asymmetry
-- Results in rapid negation expansion.
-- Automatically halts when `V < 1` in outer cells.
+## 🏗️ Architecture
 
-### 7. Collapse Manager
-- Monitors structure persistence.
-- Collapses any structure that falls below viability threshold for N frames.
-- Collapse increases entropy in local region.
+### Core Components
 
-### 8. Visualizer
-- Visual cues:
-- **Viability**: color intensity (red = high, blue = low, gray = vacuum)
-- **Entropy**: noise grain overlay or distortion field
-- **Attractors**: field lines or glow effects
-- **Negation Type**: wavelet, particle, ripple, or collapsed zone
-- Toggle views:
-- Entropy map
-- Viability field
-- Negation source view
+- `Program.cs`: Entry point, CLI argument parsing, and simulation initialization.
+- `Simulation/`, `Components/`, `Systems/`: Organized folders for ECS architecture (entities, components, systems).
+- `Shaders/`: Contains shader graphs for visual effects (e.g., entropy visualization).
+- `Prefabs/`: Placeholder for any prefabricated GameObjects (e.g., camera setups, UI elements).
+- `Materials/`: Adjustable materials for different cell types/states.
+- `Tests/`: Unit and integration tests for critical systems (e.g., viability calculations).
+
+### Experimental Features
+
+- **3D Support**: Initial setups for converting grid-based systems to 3D (optional, experimental)
+- **Attractor Mechanism**: Early-stage implementation of viability-based attractors
 
 ---
 
@@ -106,19 +77,6 @@ Every frame:
 3. Propagate or decay negation accordingly.
 4. Apply attractor influence.
 5. Visualize updated system.
-
----
-
-## 🧪 Testable Phenomena
-
-| Scenario                    | Expected Outcome                                      |
-|----------------------------|-------------------------------------------------------|
-| Vacuum state               | Nothing happens — stable nullstate                   |
-| Negation burst             | Inflation spreads until viability drops              |
-| Persistent pocket          | Becomes attractor, enabling more local negation      |
-| Excess entropy injection   | Structure decays; voids reform                       |
-| Competing attractors       | Stronger one dominates, weaker one collapses         |
-| Multi-source interaction   | Complex clustering or destructive interference        |
 
 ---
 
