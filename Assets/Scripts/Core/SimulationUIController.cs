@@ -2,6 +2,7 @@
 using TMPro;
 using UnityEngine.UI;
 using System;
+using Assets.Scripts.Core;
 
 public class SimulationUIController : MonoBehaviour
 {
