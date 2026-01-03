@@ -559,7 +559,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5ef731d10db3bfa4a940839c7f979cfb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  simController: {fileID: 0}
+  simController: {fileID: 1095549190}
   OverlayPanel: {fileID: 1272684871}
   NGlobalMaxInput: {fileID: 0}
   NGlobalInput: {fileID: 0}
@@ -584,8 +584,8 @@ MonoBehaviour:
   AvgEntropyText: {fileID: 1886540330}
   NGlobalText: {fileID: 4037817}
   TickText: {fileID: 635686010}
-  PauseButton: {fileID: 474691624}
   PlayButton: {fileID: 1954426320}
+  PauseButton: {fileID: 474691624}
   RestartButton: {fileID: 1433451701}
   PanelButton: {fileID: 1049705706}
   ToggleTypeButton: {fileID: 0}
@@ -950,6 +950,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   Grid: {fileID: 1095549188}
+  cameraDepth: -10
+  sizeFactor: 1
+  edgePadding: 0.05
 --- !u!1 &619394800
 GameObject:
   m_ObjectHideFlags: 0
@@ -2181,6 +2184,9 @@ MonoBehaviour:
   RequireViabilityForField: 0
   SeedEnergyOnFieldAdvance: 1
   FieldSeedEnergy: 0.1
+  BlackHoleFormThreshold: 0.5
+  BlackHoleDrainFrac: 0.05
+  BlackHoleRecoilFrac: 0
   VoidColor: {r: 0.05, g: 0.05, b: 0.08, a: 1}
   ShowEntropyTint: 0
   VacuumEnergyColor: {r: 0.48, g: 0.25, b: 0.52, a: 1}
@@ -2190,10 +2196,6 @@ MonoBehaviour:
   SpatialDecayK: 0.5
   renderMode: 0
   ticksPerSecond: 10
-  Grid: {fileID: 0}
-  BlackHoleFormThreshold: 0.5
-  BlackHoleDrainFrac: 0.05
-  BlackHoleRecoilFrac: 0
 --- !u!1 &1131274065
 GameObject:
   m_ObjectHideFlags: 0

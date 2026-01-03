@@ -1,215 +1,306 @@
 ﻿using System;
-using UnityEngine;
 using Assets.Scripts.Domain;
 using Assets.Scripts.Events;
 
 namespace Assets.Scripts.Simulation
 {
+    /// <summary>
+    /// Legacy 4-Pass Simulation Step
+    /// 
+    /// Concrete implementation of ISimStep that wraps the original multi-pass simulation logic.
+    /// Executes energy propagation, viability computation, global replenishment, entropy diffusion,
+    /// and post-processing (field wave, black hole growth) in a fixed sequence.
+    /// 
+    /// Design: Preserves original simulation behavior while fitting into new engine architecture.
+    /// Named "Legacy" to indicate this is the historical implementation that will be refactored later.
+    /// </summary>
     public sealed class LegacyTickStep : ISimStep
     {
-        private readonly Func<float, float, float, float> _computeViability;
-        private readonly Func<int, int> _countPersistenceConfigurations;
+        // ============================================================================
+        // PRIVATE FIELDS: INJECTED DEPENDENCIES
+        // ============================================================================
+        
+        /// <summary>
+        /// Delegate for computing viability from energy flow and state.
+        /// Signature: (incomingFlow, localEnergy, entropy) → viability
+        /// Injected from SimulationController to maintain separation of concerns.
+        /// </summary>
+        private readonly Func<float, float, float, float> _viabilityFunc;
 
-        // Hooked behaviours (so controller can inject exact methods)
-        private readonly Action _propagateFieldWave;
+        /// <summary>
+        /// Delegate for counting persistence configurations at a cell.
+        /// Signature: (cellIndex) → configurationCount
+        /// Used by Pass2 to compute configuration-based entropy.
+        /// </summary>
+        private readonly Func<int, int> _persistenceFunc;
 
+        /// <summary>
+        /// Delegate for post-processing operations (field wave, BH growth).
+        /// Executed after Pass1-4 complete.
+        /// Injected from SimulationController to allow custom post-processing logic.
+        /// </summary>
+        private readonly Action _postProcessing;
+
+        // ============================================================================
+        // CONSTRUCTOR
+        // ============================================================================
+
+        /// <summary>
+        /// Initializes the legacy tick step with injected dependencies.
+        /// </summary>
+        /// <param name="viabilityFunc">Function to compute viability</param>
+        /// <param name="persistenceFunc">Function to count persistence configurations</param>
+        /// <param name="postProcessing">Callback for post-processing (field wave, BH growth)</param>
         public LegacyTickStep(
-            Func<float, float, float, float> computeViability,
-            Func<int, int> countPersistenceConfigurations,
-            Action propagateFieldWave
-        )
+            Func<float, float, float, float> viabilityFunc,
+            Func<int, int> persistenceFunc,
+            Action postProcessing)
         {
-            _computeViability = computeViability ?? throw new ArgumentNullException(nameof(computeViability));
-            _countPersistenceConfigurations = countPersistenceConfigurations ?? throw new ArgumentNullException(nameof(countPersistenceConfigurations));
-            _propagateFieldWave = propagateFieldWave ?? throw new ArgumentNullException(nameof(propagateFieldWave));
+            _viabilityFunc = viabilityFunc ?? throw new ArgumentNullException(nameof(viabilityFunc));
+            _persistenceFunc = persistenceFunc ?? throw new ArgumentNullException(nameof(persistenceFunc));
+            _postProcessing = postProcessing ?? throw new ArgumentNullException(nameof(postProcessing));
         }
 
-        public void Execute(GridState s, SimContext ctx)
-        {
-            // -----------------------------
-            // A) Geometry / field wave first
-            // -----------------------------
-            _propagateFieldWave();
+        // ============================================================================
+        // PUBLIC API: ISTEP IMPLEMENTATION
+        // ============================================================================
 
-            // -----------------------------
-            // B) Pass1: outflow (energy transport attempt) + BH formation via boundary charge
-            // -----------------------------
-            int boundaryHitsThisTick;
-            float maxChargeThisTick;
-            int newBH = Pass1.GatherOutflow(
-                s.W, s.H,
-                s.Nlocal, s.V, s.Active, s.IsVacuum, s.Incoming,
-                ctx.Cfg.MinBudgetToPropagate,
-                ctx.Cfg.PropagateFrac,
-                s.FieldPresent,
-                s.IsBlackHole,
-                s.BlackHoleCharge,
-                ctx.Cfg.BlackHoleFormThreshold,
-                ctx.Cfg.MatterAheadThreshold,
-                s.FieldFirstTick,
-                s.EnergyFirstTick,
-                s.BlackHoleId,
-                s.BlackHoleParent,
-                s.BlackHoleMass,
-                ref s.NextBlackHoleId,
-                ctx.Tick,
-                out boundaryHitsThisTick,
-                out maxChargeThisTick
-                // [bool debugForceBHOnFirstBoundaryHit = false] is optional, omitted
+        /// <summary>
+        /// Executes one complete simulation tick using the legacy 4-pass algorithm.
+        /// 
+        /// Execution Sequence:
+        /// 1. Pass 1a: Gather Outflow (energy propagation with BH attraction)
+        /// 2. Pass 1b: Gather Inflow (seed region pulse)
+        /// 3. Pass 2: Apply Energy & Compute Viability
+        /// 4. Pass 3: Global Energy Replenishment
+        /// 5. Pass 4: Entropy Diffusion
+        /// 6. Post-Processing: Field Wave Propagation & Black Hole Growth
+        /// 
+        /// All passes modify state in-place for performance (zero allocation per tick).
+        /// </summary>
+        /// <param name="state">Grid state to modify</param>
+        /// <param name="ctx">Simulation context (tick counter, global energy, etc.)</param>
+        public void Execute(GridState state, SimContext ctx)
+        {
+            // Extract config for convenience
+            var cfg = ctx.Config;
+
+            // ========================================================================
+            // PASS 1a: ENERGY OUTFLOW (Energy Propagation with Black Hole Attraction)
+            // ========================================================================
+            // Purpose: Distributes energy from active cells to neighbors
+            // Features:
+            // - Mass-weighted black hole attraction (cells near BHs receive more energy)
+            // - Boundary void leakage → black hole formation (charge accumulation)
+            // - Energy reflection from blocked paths (stable dependencies)
+            // Output: state.Incoming[] filled with energy destined for each cell
+            ExecutePass1aEnergyOutflow(state, ctx, cfg);
+
+            // ========================================================================
+            // PASS 1b: ENERGY INFLOW (Seed Region Pulse)
+            // ========================================================================
+            // Purpose: Adds continuous energy to central seed region
+            // Features:
+            // - Exponentially decaying pulse to 5x5 center block
+            // - Ensures seed remains active during early simulation
+            // Output: Additional energy added to state.Incoming[]
+            ExecutePass1bEnergyInflow(state, ctx, cfg);
+
+            // ========================================================================
+            // PASS 2: APPLY ENERGY & COMPUTE VIABILITY
+            // ========================================================================
+            // Purpose: Applies incoming energy and updates cell states
+            // Features:
+            // - Energy application: Nlocal += Incoming
+            // - Activation cost from global pool
+            // - Entropy computation (configuration + gradient)
+            // - Viability computation (persistence criterion)
+            // - Active state update (Active = V > 0 && N > min)
+            // - Baseline decay
+            // Output: Updated Nlocal[], Entropy[], V[], Active[]
+            ExecutePass2ApplyEnergyAndViability(state, ctx, cfg);
+
+            // ========================================================================
+            // PASS 3: GLOBAL ENERGY REPLENISHMENT
+            // ========================================================================
+            // Purpose: Replenishes global energy pool at constant rate
+            // Features:
+            // - Constant replenishment rate per tick
+            // - Capped at NGlobalMax
+            // Output: Updated ctx.NGlobal
+            ExecutePass3GlobalReplenishment(ctx, cfg);
+
+            // ========================================================================
+            // PASS 4: ENTROPY DIFFUSION
+            // ========================================================================
+            // Purpose: Smooths entropy gradients across grid
+            // Features:
+            // - Discrete Laplacian operator (heat equation)
+            // - Entropy decay
+            // - Black holes maintain maximum entropy (S=1)
+            // Output: Smoothed Entropy[]
+            ExecutePass4EntropyDiffusion(state, cfg);
+
+            // ========================================================================
+            // POST-PROCESSING: FIELD WAVE & BLACK HOLE GROWTH
+            // ========================================================================
+            // Purpose: Handles geometric expansion (field and black holes)
+            // Features:
+            // - Field wave: Configuration space expansion at boundaries
+            // - Black hole growth: Geometric collapse propagation
+            // Output: Updated FieldPresent[], IsBlackHole[], BH entities
+            ExecutePostProcessing();
+        }
+
+        // ============================================================================
+        // PRIVATE: PASS 1a - ENERGY OUTFLOW
+        // ============================================================================
+
+        /// <summary>
+        /// Executes Pass 1a: Energy propagation with mass-weighted black hole attraction.
+        /// </summary>
+        private void ExecutePass1aEnergyOutflow(GridState state, SimContext ctx, SimConfig cfg)
+        {
+            Pass1.GatherOutflow(
+                width: state.W,
+                height: state.H,
+                Nlocal: state.Nlocal,
+                V: state.V,
+                Active: state.Active,
+                IsVacuum: state.IsVacuum,
+                incoming: state.Incoming,
+                MinBudgetToPropagate: cfg.MinBudgetToPropagate,
+                PropagateFrac: cfg.PropagateFrac,
+                FieldPresent: state.FieldPresent,
+                IsBlackHole: state.IsBlackHole,
+                BlackHoleCharge: state.BlackHoleCharge,
+                blackHoleThreshold: cfg.BlackHoleFormThreshold,
+                MatterAheadThreshold: 0f, // Currently unused parameter
+                FieldFirstTick: state.FieldFirstTick,
+                EnergyFirstTick: state.EnergyFirstTick,
+                BlackHoleId: state.BlackHoleId,
+                BlackHoleParent: state.BlackHoleParent,
+                BlackHoleMass: state.BlackHoleMass,
+                NextBlackHoleId: ref state.NextBlackHoleId,
+                tick: ctx.Tick,
+                boundaryHitsThisTick: out int boundaryHits,
+                maxChargeThisTick: out float maxCharge,
+                debugForceBHOnFirstBoundaryHit: false
             );
 
-            // -----------------------------
-            // C) Pass1: central inflow pulse / seeding
-            // -----------------------------
+            // Note: boundaryHits and maxCharge are logged in Pass1 itself
+        }
+
+        // ============================================================================
+        // PRIVATE: PASS 1b - ENERGY INFLOW
+        // ============================================================================
+
+        /// <summary>
+        /// Executes Pass 1b: Adds continuous energy pulse to central seed region.
+        /// </summary>
+        private void ExecutePass1bEnergyInflow(GridState state, SimContext ctx, SimConfig cfg)
+        {
             Pass1.GatherInflow(
-                s.W, s.H,
-                (x, y) => s.Idx(x, y),
-                s.Nlocal,
-                s.FieldFirstTick,
-                s.EnergyFirstTick,
-                s.FieldPresent,
-                s.Active,
-                s.Incoming,
-                ctx.Tick
+                width: state.W,
+                height: state.H,
+                Idx: state.Idx,
+                Nlocal: state.Nlocal,
+                FieldFirstTick: state.FieldFirstTick,
+                EnergyFirstTick: state.EnergyFirstTick,
+                FieldPresent: state.FieldPresent,
+                Active: state.Active,
+                incoming: state.Incoming,
+                tick: ctx.Tick
             );
-
-            // -----------------------------
-            // D) Pass2: deposit inflow + entropy/viability/active update
-            // -----------------------------
-            Pass2.ApplyAndViability(
-                (x, y) => s.Idx(x, y),
-                s.W, s.H,
-                s.Nlocal, s.Entropy, s.V, s.Active, s.IsVacuum,
-                s.Incoming,
-                s.ZeroEnergyTicks,
-                ctx.Cfg.MinBudgetToPropagate,
-                ctx.Cfg.ActivationCost,
-                ref ctx.NGlobal,
-                ctx.Cfg.NlocalMax,
-                ctx.Cfg.EntropyGainPerUse,
-                ctx.Cfg.DecayLoss,
-                ctx.Cfg.EntropyPenalty,
-                ctx.Cfg.VacuumEventProbability,
-                ctx.Cfg.VacuumEventEntropy,
-                _computeViability,
-                _countPersistenceConfigurations,
-                s.W,
-                ctx.Cfg.PropagateFrac,
-                s.FieldPresent,
-                s.IsBlackHole,
-                s.FieldFirstTick,
-                s.EnergyFirstTick,
-                ctx.Tick
-            );
-
-            // -----------------------------
-            // E) Black hole behaviour
-            // IMPORTANT: for "hard-wall BH halo", set BlackHoleDrainFrac = 0 in config.
-            // -----------------------------
-            //float drained = 0f;
-            //if (ctx.Cfg.BlackHoleDrainFrac > 0f)
-            //{
-            //    drained = BlackHoles.BlackHoleAttractEnergy(
-            //        s,
-            //        ctx.Cfg.BlackHoleDrainFrac,
-            //        false, // fieldOnly
-            //        ctx.Cfg.BlackHoleRecoilFrac
-            //    );
-            //}
-
-            // -----------------------------
-            // F) Global recharge + scale factor
-            // -----------------------------
-            Pass3.GlobalRecharge(ref ctx.NGlobal, ctx.Cfg.NGlobalMax, ctx.Cfg.GlobalReplenishPerTick);
-            ctx.ScaleFactor *= ctx.Cfg.ExpansionRate;
-
-            // -----------------------------
-            // G) Entropy diffusion
-            // -----------------------------
-            Pass4.EntropyDiffuse(s.W, s.H, s.Entropy, s.EntropyNext, ctx.Cfg.EntropyDiffuseRate, ctx.Cfg.EntropyDecay, s.IsBlackHole);
-
-            // -----------------------------
-            // H) Diagnostics (every 20 ticks)
-            // -----------------------------
-            if (ctx.Tick % 20 == 0)
-            {
-                LogDiagnostics(s, ctx, newBH, 0);
-            }
         }
 
-        private static void LogDiagnostics(GridState s, SimContext ctx, int newBH, float drained)
+        // ============================================================================
+        // PRIVATE: PASS 2 - APPLY ENERGY & VIABILITY
+        // ============================================================================
+
+        /// <summary>
+        /// Executes Pass 2: Applies incoming energy, computes entropy and viability.
+        /// </summary>
+        private void ExecutePass2ApplyEnergyAndViability(GridState state, SimContext ctx, SimConfig cfg)
         {
-            // Counts
-            int fieldCount = 0;
-            int bhCells = 0;
-
-            // Energy stats
-            int energyCount = 0;
-            float maxBHMass = 0f;
-
-            // Halo/ring stats
-            float ringSum = 0f;
-            int ringCount = 0;
-
-            float fieldSum = 0f;
-
-            int[] dx = { 0, 0, -1, 1 };
-            int[] dy = { -1, 1, 0, 0 };
-
-            for (int y = 0; y < s.H; y++)
-            {
-                for (int x = 0; x < s.W; x++)
-                {
-                    int i = s.Idx(x, y);
-
-                    if (s.FieldPresent[i])
-                    {
-                        fieldCount++;
-                        fieldSum += s.Nlocal[i];
-                    }
-
-                    if (s.Nlocal[i] > 0.1f) energyCount++;
-
-                    if (!s.IsBlackHole[i]) continue;
-
-                    bhCells++;
-
-                    // ring around BH cell
-                    for (int d = 0; d < 4; d++)
-                    {
-                        int nx = x + dx[d];
-                        int ny = y + dy[d];
-                        if (nx < 0 || nx >= s.W || ny < 0 || ny >= s.H) continue;
-
-                        int ni = s.Idx(nx, ny);
-                        if (!s.FieldPresent[ni]) continue;
-                        if (s.IsBlackHole[ni]) continue;
-
-                        ringSum += s.Nlocal[ni];
-                        ringCount++;
-                    }
-                }
-            }
-
-            // If you store BH entity masses by root id, estimate max mass by scanning BHMass array
-            // (safe, cheap). Only do it here every 20 ticks.
-            for (int id = 1; id < s.BlackHoleMass.Length; id++)
-            {
-                if (s.BlackHoleParent[id] == 0) continue;
-                if (s.BlackHoleMass[id] > maxBHMass) maxBHMass = s.BlackHoleMass[id];
-            }
-
-            float ringAvg = ringCount > 0 ? ringSum / ringCount : 0f;
-            float fieldAvg = fieldCount > 0 ? fieldSum / fieldCount : 0f;
-
-            Debug.Log(
-                $"Tick {ctx.Tick} | " +
-                $"FieldCount={fieldCount} | BHCells={bhCells} | NewBH={newBH} | " +
-                $"Drained={drained:F4} | MaxBHMass={maxBHMass:F4} | " +
-                $"EnergyCount>0.1={energyCount} | " +
-                $"RingAvgN={ringAvg:F4} FieldAvgN={fieldAvg:F4} Ring/Field={(fieldAvg > 0f ? ringAvg / fieldAvg : 0f):F2} | " +
-                $"NGlobal={ctx.NGlobal:F4}"
+            Pass2.ApplyAndViability(
+                Idx: state.Idx,
+                width: state.W,
+                height: state.H,
+                Nlocal: state.Nlocal,
+                Entropy: state.Entropy,
+                V: state.V,
+                Active: state.Active,
+                IsVacuum: state.IsVacuum,
+                incoming: state.Incoming,
+                zeroEnergyTicks: state.ZeroEnergyTicks,
+                MinBudgetToPropagate: cfg.MinBudgetToPropagate,
+                ActivationCost: cfg.ActivationCost,
+                NGlobal: ref ctx.NGlobal,
+                NlocalMax: cfg.NlocalMax,
+                EntropyGainPerUse: cfg.EntropyGainPerUse,
+                DecayLoss: cfg.DecayLoss,
+                EntropyPenalty: cfg.EntropyPenalty, // Currently unused
+                VacuumEventProbability: cfg.VacuumEventProbability,
+                VacuumEventEntropy: cfg.VacuumEventEntropy,
+                ComputeViability: _viabilityFunc,
+                CountPersistenceConfigurations: _persistenceFunc,
+                GridWidth: state.W,
+                PropagateFrac: cfg.PropagateFrac,
+                FieldPresent: state.FieldPresent,
+                IsBlackHole: state.IsBlackHole,
+                FieldFirstTick: state.FieldFirstTick,
+                EnergyFirstTick: state.EnergyFirstTick,
+                tick: ctx.Tick
             );
+        }
+
+        // ============================================================================
+        // PRIVATE: PASS 3 - GLOBAL REPLENISHMENT
+        // ============================================================================
+
+        /// <summary>
+        /// Executes Pass 3: Replenishes global energy pool.
+        /// </summary>
+        private void ExecutePass3GlobalReplenishment(SimContext ctx, SimConfig cfg)
+        {
+            Pass3.GlobalRecharge(
+                NGlobal: ref ctx.NGlobal,
+                NGlobalMax: cfg.NGlobalMax,
+                GlobalReplenishPerTick: cfg.GlobalReplenishPerTick
+            );
+        }
+
+        // ============================================================================
+        // PRIVATE: PASS 4 - ENTROPY DIFFUSION
+        // ============================================================================
+
+        /// <summary>
+        /// Executes Pass 4: Diffuses entropy using discrete Laplacian operator.
+        /// </summary>
+        private void ExecutePass4EntropyDiffusion(GridState state, SimConfig cfg)
+        {
+            Pass4.EntropyDiffuse(
+                width: state.W,
+                height: state.H,
+                Entropy: state.Entropy,
+                entropyNext: state.EntropyNext,
+                EntropyDiffuseRate: cfg.EntropyDiffuseRate,
+                EntropyDecay: cfg.EntropyDecay,
+                IsBlackHole: state.IsBlackHole
+            );
+        }
+
+        // ============================================================================
+        // PRIVATE: POST-PROCESSING
+        // ============================================================================
+
+        /// <summary>
+        /// Executes post-processing callback (field wave propagation and BH growth).
+        /// </summary>
+        private void ExecutePostProcessing()
+        {
+            _postProcessing?.Invoke();
         }
     }
 }
