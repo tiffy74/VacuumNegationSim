@@ -10,12 +10,12 @@
 The `Scripts/` directory is organized into logical subdirectories representing architectural layers of the simulation. This structure enforces separation of concerns and maintains clean dependencies between layers.
 
 Assets/Scripts/
-??? Core/           - Unity MonoBehaviour controllers and legacy types
-??? Domain/         - Pure data structures (simulation state)
-??? Simulation/     - Simulation engine and tick orchestration
-??? Events/         - Pure simulation logic (4-pass system + extensions)
-??? Unity/          - Unity-specific utilities (rendering, enums)
-??? Visuals/        - Visual representation components
++-> Core/           - Unity MonoBehaviour controllers and legacy types
++-> Domain/         - Pure data structures (simulation state)
++-> Simulation/     - Simulation engine and tick orchestration
++-> Events/         - Pure simulation logic (4-pass system + extensions)
++-> Unity/          - Unity-specific utilities (rendering, enums)
++-> Visuals/        - Visual representation components
 
 
 ---
@@ -68,44 +68,45 @@ Assets/Scripts/
 
 ## ?? Dependency Graph
 ```plaintext
-                ???????????????????????????????
-                ?         Core/               ?
-                ?  (Unity Controllers)        ?
-                ?  • SimulationController     ?
-                ?  • SimulationGrid           ?
-                ?  • SimulationUIController   ?
-                ???????????????????????????????
-                               ?
-                               ? depends on
-                               ?
-                ??????????????????????????????
-                ?                            ?
-     ???????????????????????      ???????????????????????
-     ?   Simulation/       ?      ?     Unity/          ?
-     ?   (Engine)          ?      ?   (Utilities)       ?
-     ? • SimulationEngine  ?      ? • GridRenderer      ?
-     ? • LegacyTickStep    ?      ? • RenderMode        ?
-     ???????????????????????      ???????????????????????
-                ?                            ?
-                ? depends on                 ? depends on
-                ?                            ?
-     ???????????????????????      ???????????????????????
-     ?    Events/          ?      ?    Visuals/         ?
-     ?    (Logic)          ?      ?  (Presentation)     ?
-     ?  • Pass1-4          ?      ? • CellVisualiser    ?
-     ?  • BlackHoles       ?      ? • CameraController  ?
-     ?  • FieldWave        ?      ?                     ?
-     ???????????????????????      ???????????????????????
-                ?
-                ? depends on
-                ?
-     ????????????????????????????????????????
-     ?           Domain/                    ?
-     ?    (Pure Data - No Dependencies)     ?
-     ?        • GridState                   ?
-     ?        • SimContext                  ?
-     ?        • SimConfig                   ?
-     ????????????????????????????????????????
+                +-----------------------------+
+                |         Core/               |
+                |  (Unity Controllers)        |
+                |  * SimulationController     |
+                |  * SimulationGrid           |
+                |  * SimulationUIController   |
+                +--------------+--------------+
+                               |
+                               | depends on
+                               |
+                +--------------+-------------+
+                |                            |
+     +----------v----------+      +----------v----------+
+     |   Simulation/       |      |     Unity/          |
+     |   (Engine)          |      |   (Utilities)       |
+     | * SimulationEngine  |      | * GridRenderer      |
+     | * LegacyTickStep    |      | * RenderMode        |
+     +----------+----------+      +----------+----------+
+                |                            |
+                | depends on                 | depends on
+                |                            |
+     +----------v----------+      +----------v----------+
+     |    Events/          |      |    Visuals/         |
+     |    (Logic)          |      |  (Presentation)     |
+     |  * Pass1-4          |      | * CellVisualiser    |
+     |  * BlackHoles       |      | * CameraController  |
+     |  * FieldWave        |      |                     |
+     +----------+----------+      +---------------------+
+                |
+                | depends on
+                |
+     +----------v-------------------+
+     |           Domain/            |
+     |    (Pure Data - No Deps)     |
+     |        * GridState           |
+     |        * SimContext          |
+     |        * SimConfig           |
+     +------------------------------+
+
 
 ```
 
@@ -114,23 +115,23 @@ Assets/Scripts/
 
 ### **Initialization (Startup)**
 1. SimulationController.Start()
-   ??> Initialize GridState (Domain)
-   ??> Initialize SimContext (Domain)
-   ??> Create SimulationEngine (Simulation)
-   ??> Spawn Visual Cells via SimulationGrid (Core)
-   ??> Initialize GridRenderer (Unity)
+   +-> Initialize GridState (Domain)
+   +-> Initialize SimContext (Domain)
+   +-> Create SimulationEngine (Simulation)
+   +-> Spawn Visual Cells via SimulationGrid (Core)
+   +-> Initialize GridRenderer (Unity)
 
 2. SimulationGrid.SpawnVisualCells()
-   ??> Instantiate cell GameObjects
-   ??> Store CellVisualiser references
+   +-> Instantiate cell GameObjects
+   +-> Store CellVisualiser references
 
 3. CameraController.Awake()
    ??> Center camera on grid
 
 ### **User Interaction**
 SimulationUIController (Core)
-   ??> Play/Pause/Restart buttons
-   ??> SimulationController.Play() / Pause() / RestartSimulation()
+   +-> Play/Pause/Restart buttons
+   +-> SimulationController.Play() / Pause() / RestartSimulation()
 
 
 ## ?? File Naming Conventions
