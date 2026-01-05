@@ -12,14 +12,14 @@ namespace Assets.Scripts.Events
     /// </summary>
     public static class Pass1
     {
-        // ==========================================================================csharp
+        // ============================================================================
         // PRIVATE CONSTANTS
-        // =========================================================================
+        // ============================================================================
         
         private static readonly int[] dx = { 0, 0, -1, 1 };
         private static readonly int[] dy = { -1, 1, 0, 0 };
 
-        // =========================================================================
+        // ============================================================================
         // PUBLIC API: ENERGY PROPAGATION
         // ============================================================================
 
@@ -28,6 +28,7 @@ namespace Assets.Scripts.Events
         /// Energy flows from active cells to neighbors, weighted by proximity to black holes.
         /// Creates black holes at boundary voids when charge threshold is exceeded.
         /// </summary>
+        /// <param name="blockedIntoBH">Accumulator for energy blocked by black holes (diagnostic)</param>
         /// <returns>Number of new black holes created this tick</returns>
         public static int GatherOutflow(
             int width, int height,
@@ -37,6 +38,9 @@ namespace Assets.Scripts.Events
             int[] FieldFirstTick, int[] EnergyFirstTick,
             int[] BlackHoleId, int[] BlackHoleParent, float[] BlackHoleMass, ref int NextBlackHoleId,
             int tick, out int boundaryHitsThisTick, out float maxChargeThisTick,
+            ref float blockedIntoBH,
+            ref int leakAttempts,
+            ref float leakEnergy,
             bool debugForceBHOnFirstBoundaryHit = false)
         {
             InitializeOutflowBuffers(incoming, out int newBhCount, out boundaryHitsThisTick, out maxChargeThisTick);
@@ -54,9 +58,10 @@ namespace Assets.Scripts.Events
                 BlackHoleCharge, blackHoleThreshold, BlackHoleId, BlackHoleParent, BlackHoleMass,
                 ref NextBlackHoleId, tick, bhAttractionWeight,
                 ref newBhCount, ref boundaryHitsThisTick, ref maxChargeThisTick,
+                ref blockedIntoBH,
+                ref leakAttempts,
+                ref leakEnergy,
                 debugForceBHOnFirstBoundaryHit);
-
-            LogPropagationDiagnostics(tick, boundaryHitsThisTick, maxChargeThisTick, newBhCount);
 
             return newBhCount;
         }
@@ -183,6 +188,9 @@ namespace Assets.Scripts.Events
             int[] BlackHoleId, int[] BlackHoleParent, float[] BlackHoleMass, ref int NextBlackHoleId,
             int tick, float[] bhAttractionWeight,
             ref int newBhCount, ref int boundaryHitsThisTick, ref float maxChargeThisTick,
+            ref float blockedIntoBH,
+            ref int leakAttempts,
+            ref float leakEnergy,
             bool debugForceBHOnFirstBoundaryHit)
         {
             for (int y = 0; y < height; y++)
@@ -203,6 +211,9 @@ namespace Assets.Scripts.Events
                         BlackHoleCharge, blackHoleThreshold, BlackHoleId, BlackHoleParent, BlackHoleMass,
                         ref NextBlackHoleId, tick, bhAttractionWeight,
                         ref newBhCount, ref boundaryHitsThisTick, ref maxChargeThisTick,
+                        ref blockedIntoBH,
+                        ref leakAttempts,
+                        ref leakEnergy,
                         debugForceBHOnFirstBoundaryHit);
                 }
             }
@@ -243,11 +254,15 @@ namespace Assets.Scripts.Events
             int[] BlackHoleId, int[] BlackHoleParent, float[] BlackHoleMass, ref int NextBlackHoleId,
             int tick, float[] bhAttractionWeight,
             ref int newBhCount, ref int boundaryHitsThisTick, ref float maxChargeThisTick,
+            ref float blockedIntoBH,
+            ref int leakAttempts,
+            ref float leakEnergy,
             bool debugForceBHOnFirstBoundaryHit)
         {
             // Analyze all 4 neighbors
             var neighborAnalysis = AnalyzeNeighbors(
-                x, y, width, height, Idx, IsVacuum, IsBlackHole, FieldPresent, bhAttractionWeight);
+                x, y, width, height, Idx, IsVacuum, IsBlackHole, FieldPresent, bhAttractionWeight,
+                ref leakAttempts, ref leakEnergy, available);
 
             // Distribute energy based on neighbor types
             float sentTotal = DistributeEnergyToFieldNeighbors(
@@ -259,9 +274,10 @@ namespace Assets.Scripts.Events
                 ref newBhCount, ref boundaryHitsThisTick, ref maxChargeThisTick,
                 debugForceBHOnFirstBoundaryHit);
 
-            reflectedEnergy += HandleBlockedBlackHoleNeighbors(available, neighborAnalysis);
+            // CRITICAL FIX: Blocked energy is reflected back to source cell (Option 1)
+            reflectedEnergy += HandleBlockedBlackHoleNeighbors(available, neighborAnalysis, ref blockedIntoBH);
 
-            // Update source cell energy
+            // Update source cell energy: deduct sent energy, add reflected energy
             ApplyEnergyTransfers(i, Nlocal, incoming, sentTotal, reflectedEnergy);
         }
 
@@ -287,7 +303,8 @@ namespace Assets.Scripts.Events
         /// </summary>
         private static NeighborAnalysis AnalyzeNeighbors(
             int x, int y, int width, int height, Func<int, int, int> Idx,
-            bool[] IsVacuum, bool[] IsBlackHole, bool[] FieldPresent, float[] bhAttractionWeight)
+            bool[] IsVacuum, bool[] IsBlackHole, bool[] FieldPresent, float[] bhAttractionWeight,
+            ref int leakAttempts, ref float leakEnergy, float available)
         {
             var analysis = new NeighborAnalysis
             {
@@ -314,7 +331,7 @@ namespace Assets.Scripts.Events
 
                 ClassifyNeighbor(
                     neighborIdx, nx, ny, width, height, IsVacuum, IsBlackHole, FieldPresent,
-                    bhAttractionWeight, ref analysis, d);
+                    bhAttractionWeight, ref analysis, d, ref leakAttempts, ref leakEnergy, available);
             }
 
             return analysis;
@@ -326,7 +343,8 @@ namespace Assets.Scripts.Events
         private static void ClassifyNeighbor(
             int neighborIdx, int nx, int ny, int width, int height,
             bool[] IsVacuum, bool[] IsBlackHole, bool[] FieldPresent,
-            float[] bhAttractionWeight, ref NeighborAnalysis analysis, int direction)
+            float[] bhAttractionWeight, ref NeighborAnalysis analysis, int direction,
+            ref int leakAttempts, ref float leakEnergy, float available)
         {
             // Case 1: Vacuum (impassable)
             if (IsVacuum[neighborIdx])
@@ -356,11 +374,19 @@ namespace Assets.Scripts.Events
             if (IsBoundaryVoid(neighborIdx, width, height, FieldPresent))
             {
                 analysis.IsBoundaryVoid[direction] = true;
+                
+                // DIAGNOSTIC: Track leak attempt
+                leakAttempts++;
+                leakEnergy += available * 0.25f; // Portion that would leak
                 return;
             }
 
-            // Case 5: Isolated void (no propagation)
+            // Case 5: Isolated void (no propagation, but still counts as leak attempt)
             analysis.Weights[direction] = 0f;
+            
+            // DIAGNOSTIC: Track leak attempt to isolated void
+            leakAttempts++;
+            leakEnergy += available * 0.25f;
         }
 
         // ============================================================================
@@ -422,11 +448,6 @@ namespace Assets.Scripts.Events
                     IsBlackHole, BlackHoleId, BlackHoleParent, BlackHoleMass,
                     ref NextBlackHoleId, ref newBhCount, debugForceBHOnFirstBoundaryHit);
 
-                if (blackHoleCreated)
-                {
-                    LogBlackHoleCreation(neighborIdx, width, tick, BlackHoleMass, BlackHoleId[neighborIdx]);
-                }
-
                 totalReflectedEnergy += leakPortion;
             }
 
@@ -474,8 +495,11 @@ namespace Assets.Scripts.Events
         /// <summary>
         /// Handles energy that tries to propagate into black hole neighbors.
         /// Energy is reflected back (cannot penetrate collapsed configuration space).
+        /// 
+        /// DIAGNOSTIC: Accumulates blocked energy flux for halo analysis.
         /// </summary>
-        private static float HandleBlockedBlackHoleNeighbors(float available, NeighborAnalysis analysis)
+        private static float HandleBlockedBlackHoleNeighbors(
+            float available, NeighborAnalysis analysis, ref float blockedIntoBH)
         {
             float totalBlocked = 0f;
 
@@ -485,6 +509,9 @@ namespace Assets.Scripts.Events
 
                 float blockedPortion = available * 0.25f;
                 totalBlocked += blockedPortion;
+
+                // DIAGNOSTIC: Accumulate blocked flux (measurement only, no behavior change)
+                blockedIntoBH += blockedPortion;
             }
 
             return totalBlocked;
@@ -504,7 +531,7 @@ namespace Assets.Scripts.Events
                 incoming[sourceIdx] += reflectedEnergy;
         }
 
-        // ============================================================================
+        // =========================================================================
         // PRIVATE: SEED REGION INFLOW
         // ============================================================================
 
@@ -623,30 +650,6 @@ namespace Assets.Scripts.Events
         private static bool IsInBounds(int x, int y, int width, int height)
         {
             return x >= 0 && x < width && y >= 0 && y < height;
-        }
-
-        // ============================================================================
-        // PRIVATE: DIAGNOSTICS
-        // ============================================================================
-
-        /// <summary>
-        /// Logs propagation statistics every 20 ticks.
-        /// </summary>
-        private static void LogPropagationDiagnostics(int tick, int boundaryHits, float maxCharge, int newBhCount)
-        {
-            if (tick % 20 == 0)
-            {
-                Debug.Log($"[Tick {tick}] BoundaryHits={boundaryHits} MaxCharge={maxCharge:F4} NewBH={newBhCount}");
-            }
-        }
-
-        /// <summary>
-        /// Logs black hole creation event.
-        /// </summary>
-        private static void LogBlackHoleCreation(int idx, int width, int tick, float[] BlackHoleMass, int bhId)
-        {
-            float totalMass = (bhId > 0 && bhId < BlackHoleMass.Length) ? BlackHoleMass[bhId] : 1f;
-            Debug.Log($"BH created/merged at ({idx % width}, {idx / width}) tick={tick}, root={bhId}, totalMass={totalMass:F2}");
         }
     }
 }

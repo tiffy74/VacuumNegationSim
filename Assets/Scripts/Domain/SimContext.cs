@@ -105,6 +105,173 @@ namespace Assets.Scripts.Domain
         public int Tick;
 
         // ============================================================================
+        // PUBLIC FIELDS: BLACK HOLE HALO DIAGNOSTICS
+        // ============================================================================
+
+        /// <summary>
+        /// Blocked Energy Flux Into Black Holes (Diagnostic)
+        /// 
+        /// Total energy that attempted to propagate into black hole cells during
+        /// Pass1.GatherOutflow but was blocked due to geometric constraints.
+        /// 
+        /// Purpose: Verify hypothesis that halos are caused by blocked propagation.
+        /// 
+        /// Interpretation:
+        /// - Non-zero: Energy is attempting to flow into BHs but cannot
+        /// - Zero: No blocked flux (halos must have different cause)
+        /// 
+        /// Reset: Cleared at start of each tick
+        /// Updated: Accumulated during Pass1.GatherOutflow
+        /// Logged: After Pass2 completes
+        /// 
+        /// Units: Energy units (same as Nlocal)
+        /// Range: [0, +inf) per tick
+        /// </summary>
+        public float BlockedIntoBH;
+
+        /// <summary>
+        /// Average Energy Adjacent to Black Holes (Diagnostic)
+        /// 
+        /// Average Nlocal value in the 4-neighbor ring around all black hole cells,
+        /// excluding black holes themselves and vacuum cells.
+        /// 
+        /// Purpose: Measure energy accumulation near black hole boundaries.
+        /// 
+        /// Interpretation:
+        /// - Increases with lag after BlockedIntoBH: Confirms pile-up hypothesis
+        /// - No correlation: Halos caused by other mechanisms
+        /// 
+        /// Computed: After Pass2.ApplyAndViability completes
+        /// Logged: Together with BlockedIntoBH
+        /// 
+        /// Units: Energy units (average of Nlocal)
+        /// Range: [0, NlocalMax]
+        /// </summary>
+        public float AdjEnergyNearBH;
+
+        // ============================================================================
+        // PUBLIC FIELDS: LEAK DIAGNOSTICS
+        // ============================================================================
+
+        /// <summary>
+        /// Leak Attempts Count (Diagnostic)
+        /// 
+        /// Number of neighbor targets where energy attempted to propagate
+        /// but FieldPresent=false (void/non-field neighbors).
+        /// 
+        /// Purpose: Verify if leak events are actually happening.
+        /// 
+        /// Interpretation:
+        /// - Non-zero: Energy is attempting to leak into voids
+        /// - Zero: No leak attempts (field boundaries may be inactive)
+        /// 
+        /// Reset: Cleared at start of each tick
+        /// Updated: Incremented during Pass1.GatherOutflow
+        /// Logged: After Pass2 completes
+        /// 
+        /// Units: Count of neighbor targets
+        /// Range: [0, +inf) per tick
+        /// </summary>
+        public int LeakAttempts;
+
+        /// <summary>
+        /// Leak Energy Total (Diagnostic)
+        /// 
+        /// Total energy that attempted to propagate into void/non-field neighbors
+        /// (FieldPresent=false) during Pass1.GatherOutflow.
+        /// 
+        /// Purpose: Measure magnitude of leak attempts.
+        /// 
+        /// Interpretation:
+        /// - Non-zero: Substantial energy trying to leak
+        /// - Zero: No energy leaking (boundaries inactive or no field edges)
+        /// 
+        /// Reset: Cleared at start of each tick
+        /// Updated: Accumulated during Pass1.GatherOutflow
+        /// Logged: After Pass2 completes
+        /// 
+        /// Units: Energy units (same as Nlocal)
+        /// Range: [0, +inf) per tick
+        /// </summary>
+        public float LeakEnergy;
+
+        // ============================================================================
+        // PUBLIC FIELDS: BACKGROUND VS HALO ENERGY DIAGNOSTICS
+        // ============================================================================
+
+        /// <summary>
+        /// Average Energy in Field Cells (Diagnostic)
+        /// 
+        /// Average Nlocal over all cells where FieldPresent=true AND IsBlackHole=false.
+        /// Represents "background" energy level in active field.
+        /// 
+        /// Purpose: Baseline for comparing halo energy accumulation.
+        /// 
+        /// Computed: After Pass2.ApplyAndViability completes
+        /// Logged: Together with AvgNRingBH
+        /// 
+        /// Units: Energy units (average of Nlocal)
+        /// Range: [0, NlocalMax]
+        /// </summary>
+        public float AvgNField;
+
+        /// <summary>
+        /// Average Energy in Black Hole Adjacent Ring (Diagnostic)
+        /// 
+        /// Average Nlocal in cells adjacent to black holes (4-neighbor ring),
+        /// excluding black holes themselves and vacuum cells.
+        /// 
+        /// Purpose: Measure "halo" energy level.
+        /// 
+        /// Computed: After Pass2.ApplyAndViability completes
+        /// Logged: Together with AvgNField
+        /// 
+        /// Units: Energy units (average of Nlocal)
+        /// Range: [0, NlocalMax]
+        /// </summary>
+        public float AvgNRingBH;
+
+        /// <summary>
+        /// Ring Energy Minus Field Energy (Diagnostic)
+        /// 
+        /// Difference: AvgNRingBH - AvgNField
+        /// 
+        /// Purpose: Quantify excess energy in halos vs background.
+        /// 
+        /// Interpretation:
+        /// - Positive: Halos have higher energy than field background (confirms pile-up)
+        /// - Zero: No energy difference
+        /// - Negative: Halos depleted (unexpected)
+        /// 
+        /// Computed: After Pass2.ApplyAndViability completes
+        /// Logged: After Pass2 completes
+        /// 
+        /// Units: Energy units (difference)
+        /// Range: (-NlocalMax, +NlocalMax)
+        /// </summary>
+        public float RingMinusField;
+
+        /// <summary>
+        /// Ring Energy Ratio to Field Energy (Diagnostic)
+        /// 
+        /// Ratio: AvgNRingBH / (AvgNField + epsilon)
+        /// 
+        /// Purpose: Quantify halo energy as multiplier of background.
+        /// 
+        /// Interpretation:
+        /// - > 1: Halos have more energy than background
+        /// - = 1: No energy difference
+        /// - < 1: Halos depleted
+        /// 
+        /// Computed: After Pass2.ApplyAndViability completes
+        /// Logged: After Pass2 completes
+        /// 
+        /// Units: Dimensionless ratio
+        /// Range: [0, +inf)
+        /// </summary>
+        public float RingRatio;
+
+        // ============================================================================
         // CONSTRUCTOR
         // ============================================================================
 
@@ -121,6 +288,16 @@ namespace Assets.Scripts.Domain
             NGlobal = initialNGlobal;
             ScaleFactor = initialScale;
             Tick = 0; // Always start at tick 0
+            
+            // Initialize all diagnostic fields to zero
+            BlockedIntoBH = 0f;
+            AdjEnergyNearBH = 0f;
+            LeakAttempts = 0;
+            LeakEnergy = 0f;
+            AvgNField = 0f;
+            AvgNRingBH = 0f;
+            RingMinusField = 0f;
+            RingRatio = 0f;
         }
 
         // ============================================================================
