@@ -1,6 +1,7 @@
 using System;
 using Viable.Engine.State;
 using Viable.Engine.Execution;
+using Viable.Engine.Logic;
 
 namespace Viable.Engine.Steps
 {
@@ -70,7 +71,7 @@ namespace Viable.Engine.Steps
                         if (IsSink[nIdx])
                         {
                             // Get the ROOT of this sink (handles merged sinks)
-                            int root = Logic.SinkLogic.GetRootAtCell(nIdx, SinkId, SinkParent);
+                            int root = SinkLogic.GetRootAtCell(nIdx, SinkId, SinkParent);
                             
                             // Get the total mass of this merged sink
                             float sinkMass = 1f; // Default mass
@@ -212,7 +213,7 @@ namespace Viable.Engine.Steps
                         if (shouldCreate)
                         {
                             // This automatically merges with adjacent sinks via union-find
-                            int sinkRoot = Logic.SinkLogic.AssignOrMergeAtCell(
+                            int sinkRoot = SinkLogic.AssignOrMergeAtCell(
                                 neighborIdx, width, height,
                                 IsSink, SinkId, SinkParent, SinkMass, ref NextSinkId);
                             

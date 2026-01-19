@@ -1,3 +1,9 @@
+// =============================================
+// DEPRECATED: This file will be removed in Phase 7
+// Use: Viable.Engine.Logic.SinkLogic instead
+// Core union-find logic has been extracted to engine
+// =============================================
+
 using Assets.Scripts.Domain;
 using System;
 using UnityEngine;
