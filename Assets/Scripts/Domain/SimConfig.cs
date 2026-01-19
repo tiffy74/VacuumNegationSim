@@ -5,6 +5,10 @@ using System.Text;
 using System.Threading.Tasks;
 using UnityEngine;
 
+// [DEPRECATED - Phase 2] This file will be removed in Phase 7
+// New location: Assets/Viable/Engine/Configuration/SimulationConfiguration.cs
+// DO NOT modify this file - changes go to new location
+
 namespace Assets.Scripts.Domain
 {
     public sealed class SimConfig

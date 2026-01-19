@@ -2,8 +2,8 @@
     "name": "Viable.Core.Unity",
     "rootNamespace": "Viable.Core.Unity",
     "references": [
-        "GUID:b8c8f6d8e3f4a4c4a8b8c8f6d8e3f4a4",
-        "GUID:c9d9e7f8a4b4c4d4e8f8c9d9e7f8a4b4"
+        "Viable.Contracts",
+        "Viable.Engine"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

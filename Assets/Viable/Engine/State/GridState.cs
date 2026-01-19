@@ -1,16 +1,12 @@
-﻿using System;
+using System;
 
-// [DEPRECATED - Phase 2] This file will be removed in Phase 7
-// New location: Assets/Viable/Engine/State/GridState.cs
-// DO NOT modify this file - changes go to new location
-
-namespace Assets.Scripts.Domain
+namespace Viable.Engine.State
 {
     /// <summary>
     /// Pure simulation state for a 2D grid. No Unity objects, no rendering, no behaviour.
     /// All per-cell fields are flattened arrays of length W*H.
     /// </summary>
-    public sealed class StateGrid
+    public sealed class GridState
     {
         public readonly int W;
         public readonly int H;
@@ -52,7 +48,7 @@ namespace Assets.Scripts.Domain
         // ---- Other book-keeping ----
         public int[] ZeroResourceTicks;
 
-        public StateGrid(int width, int height, int initialSinkCapacity = 8192)
+        public GridState(int width, int height, int initialSinkCapacity = 8192)
         {
             if (width <= 0) throw new ArgumentOutOfRangeException(nameof(width));
             if (height <= 0) throw new ArgumentOutOfRangeException(nameof(height));
