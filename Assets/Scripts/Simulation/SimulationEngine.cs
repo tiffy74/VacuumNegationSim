@@ -10,9 +10,9 @@ namespace Assets.Scripts.Simulation
     public sealed class SimulationEngine
     {
         private readonly List<ISimStep> _steps;
-        public GridState State { get; }
+        public StateGrid State { get; }
 
-        public SimulationEngine(GridState state, IEnumerable<ISimStep> steps)
+        public SimulationEngine(StateGrid state, IEnumerable<ISimStep> steps)
         {
             State = state;
             _steps = new List<ISimStep>(steps);

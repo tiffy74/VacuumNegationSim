@@ -10,13 +10,13 @@ namespace Assets.Scripts.Domain
     {
         public readonly SimConfig Cfg;
         public int Tick;
-        public float NGlobal;
+        public float ResourceGlobal;
         public float ScaleFactor;
 
         public SimContext(SimConfig cfg, float initialGlobal, float initialScale)
         {
             Cfg = cfg;
-            NGlobal = initialGlobal;
+            ResourceGlobal = initialGlobal;
             ScaleFactor = initialScale;
             Tick = 0;
         }

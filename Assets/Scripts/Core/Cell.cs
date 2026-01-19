@@ -3,38 +3,36 @@ using UnityEngine;
 
 public class Cell
 {
-    public Vector2Int GridPosition;      // Grid coordinates (x, y)
+    public Vector2Int GridPosition;
 
     // Core state
-    public bool IsVacuum = true;         // True if this cell is not currently negated
-    public bool IsNegationSource = false;
+    public bool IsInactive = true;       // True if this cell is permanently inactive
+    public bool IsSource = false;
 
-    // Thermodynamic fields
-    public float Energy = 2.0f;            // Total stored energy
-    public float Viability = 2.0f;         // Computed each tick from Energy / Entropy resistance
+    // Resource and maintenance
+    public float Resource = 2.0f;        // Total stored resource
+    public float Viability = 2.0f;       // Computed each tick from resource / complexity resistance
 
-    public float Entropy = 0f;           // Current entropy (resists viability)
-    public float EntropyNext = 0f;       // Used for diffusion
-    public bool IsEntropyLocked = false; // If true, entropy does not diffuse (e.g. shield walls)
+    public float ComplexityMetric = 0f;  // Current structural complexity (resists viability)
+    public float ComplexityNext = 0f;    // Used for diffusion
+    public bool IsComplexityLocked = false; // If true, complexity does not diffuse
 
     // Optional extensions
     public float Symmetry = 1f;          // Placeholder for future symmetry-based viability
     public Cell[] Neighbors;             // Cached 4-way or 8-way neighbors
-    public bool IsSource = false;
 
-    // public List<Cell> Neighbors = new List<Cell>();
     public CellVisualiser Visual;
 
-    public float BaseEntropy = 0f; // seeded once (e.g., Perlin or 0)
-    public float EntropyDyn = 0f; // evolves each tick
+    public float BaseComplexity = 0f;    // seeded once
+    public float ComplexityDyn = 0f;     // evolves each tick
 
-    public CellVisualiser Visualiser;   // link to the sprite renderer helper
+    public CellVisualiser Visualiser;    // link to the sprite renderer helper
 
-
-    public float TotalEntropy
+    public float TotalComplexity
     {
-        get { return Mathf.Clamp01(BaseEntropy + EntropyDyn); }
+        get { return Mathf.Clamp01(BaseComplexity + ComplexityDyn); }
     }
+    
     public Cell(Vector2Int position)
     {
         GridPosition = position;

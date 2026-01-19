@@ -10,19 +10,19 @@ namespace Assets.Scripts.Events
     public static class Pass4
     {
         /// <summary>
-        /// Diffuses entropy across the grid using a simple Laplacian, then applies decay and clamps.
+        /// Diffuses complexity metric across the grid using a simple Laplacian, then applies decay and clamps.
         /// </summary>
         /// <param name="width">Grid width</param>
         /// <param name="height">Grid height</param>
-        /// <param name="Entropy">Current entropy array</param>
-        /// <param name="entropyNext">Buffer for next entropy state</param>
-        /// <param name="EntropyDiffuseRate">Diffusion rate</param>
-        /// <param name="EntropyDecay">Entropy decay per tick</param>
-        public static void EntropyDiffuse(
+        /// <param name="ComplexityMetric">Current complexity array</param>
+        /// <param name="complexityNext">Buffer for next complexity state</param>
+        /// <param name="ComplexityDiffusionRate">Diffusion rate</param>
+        /// <param name="ComplexityDecay">Complexity decay per tick</param>
+        public static void ComplexityDiffuse(
             int width, int height,
-            float[] Entropy, float[] entropyNext,
-            float EntropyDiffuseRate, float EntropyDecay,
-            bool[] IsBlackHole)
+            float[] ComplexityMetric, float[] complexityNext,
+            float ComplexityDiffusionRate, float ComplexityDecay,
+            bool[] IsSink)
         {
             int Idx(int x, int y) => y * width + x;
 
@@ -32,28 +32,28 @@ namespace Assets.Scripts.Events
                 {
                     int i = Idx(x, y);
 
-                    if (IsBlackHole[i])
+                    if (IsSink[i])
                     {
-                        entropyNext[i] = 1f;
+                        complexityNext[i] = 1f;
                         continue;
                     }
 
-                    float c = Entropy[i];
-                    float n = (y > 0 && !IsBlackHole[i - width]) ? Entropy[i - width] : c;
-                    float s = (y < height - 1 && !IsBlackHole[i + width]) ? Entropy[i + width] : c;
-                    float w = (x > 0 && !IsBlackHole[i - 1]) ? Entropy[i - 1] : c;
-                    float e = (x < width - 1 && !IsBlackHole[i + 1]) ? Entropy[i + 1] : c;
+                    float c = ComplexityMetric[i];
+                    float n = (y > 0 && !IsSink[i - width]) ? ComplexityMetric[i - width] : c;
+                    float s = (y < height - 1 && !IsSink[i + width]) ? ComplexityMetric[i + width] : c;
+                    float w = (x > 0 && !IsSink[i - 1]) ? ComplexityMetric[i - 1] : c;
+                    float e = (x < width - 1 && !IsSink[i + 1]) ? ComplexityMetric[i + 1] : c;
 
                     float lap = (n + s + w + e - 4f * c);
-                    float diffused = c + EntropyDiffuseRate * lap;
-                    diffused = Mathf.Max(0f, diffused - EntropyDecay);
-                    entropyNext[i] = Mathf.Clamp01(diffused);
+                    float diffused = c + ComplexityDiffusionRate * lap;
+                    diffused = Mathf.Max(0f, diffused - ComplexityDecay);
+                    complexityNext[i] = Mathf.Clamp01(diffused);
                 }
             }
 
             // Commit next state to current
-            for (int i = 0; i < entropyNext.Length; i++)
-                Entropy[i] = entropyNext[i];
+            for (int i = 0; i < complexityNext.Length; i++)
+                ComplexityMetric[i] = complexityNext[i];
         }
     }
 }

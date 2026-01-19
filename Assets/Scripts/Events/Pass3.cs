@@ -9,14 +9,14 @@ namespace Assets.Scripts.Events
     public static class Pass3
     {
         /// <summary>
-        /// Recharges the global energy pool, capping at the maximum.
+        /// Recharges the global resource pool, capping at the maximum.
         /// </summary>
-        /// <param name="NGlobal">Current global energy (ref)</param>
-        /// <param name="NGlobalMax">Maximum global energy</param>
+        /// <param name="ResourceGlobal">Current global resource (ref)</param>
+        /// <param name="ResourceGlobalMax">Maximum global resource</param>
         /// <param name="GlobalReplenishPerTick">Amount to replenish per tick</param>
-        public static void GlobalRecharge(ref float NGlobal, float NGlobalMax, float GlobalReplenishPerTick)
+        public static void GlobalRecharge(ref float ResourceGlobal, float ResourceGlobalMax, float GlobalReplenishPerTick)
         {
-            NGlobal = Math.Min(NGlobalMax, NGlobal + GlobalReplenishPerTick);
+            ResourceGlobal = Math.Min(ResourceGlobalMax, ResourceGlobal + GlobalReplenishPerTick);
         }
     }
 }

@@ -9,6 +9,6 @@ namespace Assets.Scripts.Simulation
 {
     public interface ISimStep
     {
-        void Execute(GridState s, SimContext ctx);
+        void Execute(StateGrid s, SimContext ctx);
     }
 }

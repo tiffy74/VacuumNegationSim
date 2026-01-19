@@ -6,50 +6,49 @@ namespace Assets.Scripts.Domain
     /// Pure simulation state for a 2D grid. No Unity objects, no rendering, no behaviour.
     /// All per-cell fields are flattened arrays of length W*H.
     /// </summary>
-    public sealed class GridState
+    public sealed class StateGrid
     {
         public readonly int W;
         public readonly int H;
         public readonly int Len;
 
         // ---- Per-cell fields ----
-        public float[] Nlocal;        // local energy/budget
-        public float[] Entropy;       // 0..1 (your "complexity proxy")
-        public float[] V;             // viability
-        public byte[] Active;         // 0/1
+        public float[] ResourceLocal;     // local resource budget
+        public float[] ComplexityMetric;  // 0..1 structural complexity proxy
+        public float[] V;                 // viability score
+        public byte[] Active;             // 0/1
 
-        public float[] Incoming;      // Pass1 -> Pass2 buffer
-        public float[] EntropyNext;   // Pass4 diffusion ping-pong
-        public bool[] IsVacuum;       // permanent/semipermanent vacuum cell
+        public float[] Incoming;          // Pass1 -> Pass2 buffer
+        public float[] ComplexityNext;    // Pass4 diffusion ping-pong
+        public bool[] IsInactive;         // permanent/semipermanent inactive cell
 
-        // ---- Field/geometry presence ----
-        public bool[] FieldPresent;   // configuration/geometry available
-        public int[] FieldFirstTick;  // -1 until field arrives
-        public int[] EnergyFirstTick; // -1 until energy arrives
+        // ---- Region/geometry presence ----
+        public bool[] ActiveRegion;       // region where state transitions are defined
+        public int[] RegionActivationTick;  // -1 until region becomes active
+        public int[] ResourceFirstTick;   // -1 until resource arrives
 
-        // ---- Black hole per-cell mask ----
-        public bool[] IsBlackHole;    // true if this cell belongs to a BH region
+        // ---- Sink region per-cell mask ----
+        public bool[] IsSink;             // true if this cell belongs to a sink region
 
-        // ---- Black hole charging (boundary attempt accumulation) ----
-        public float[] BlackHoleCharge; // charge accumulated on non-field boundary cells
+        // ---- Sink boundary charging (accumulation) ----
+        public float[] SinkCharge;        // charge accumulated on inactive boundary cells
 
-        // ---- Black hole union-find identity / merging ----
-        // If a cell is a BH cell, BlackHoleId[cell] is the BH entity id (>0).
-        public int[] BlackHoleId;       // per cell: BH entity id (0 = none)
-        public int[] BlackHoleParent;   // union-find parent pointers, indexed by BH entity id
-        public float[] BlackHoleMass;   // mass per BH entity id (index by root id)
+        // ---- Sink union-find identity / merging ----
+        // If a cell is a sink cell, SinkId[cell] is the sink entity id (>0).
+        public int[] SinkId;              // per cell: sink entity id (0 = none)
+        public int[] SinkParent;          // union-find parent pointers, indexed by sink entity id
+        public float[] SinkMass;          // mass per sink entity id (index by root id)
 
         // Next ID to assign (starts at 1)
-        public int NextBlackHoleId = 1;
+        public int NextSinkId = 1;
 
-        // ---- Optional helper field (if you later use it) ----
-        // Not required for correctness, but often useful for diagnostics/forces.
-        public float[] BlackHolePotential;
+        // ---- Optional helper field for diagnostics/forces ----
+        public float[] SinkPotential;
 
         // ---- Other book-keeping ----
-        public int[] ZeroEnergyTicks;
+        public int[] ZeroResourceTicks;
 
-        public GridState(int width, int height, int initialBlackHoleCapacity = 8192)
+        public StateGrid(int width, int height, int initialSinkCapacity = 8192)
         {
             if (width <= 0) throw new ArgumentOutOfRangeException(nameof(width));
             if (height <= 0) throw new ArgumentOutOfRangeException(nameof(height));
@@ -59,33 +58,33 @@ namespace Assets.Scripts.Domain
             Len = W * H;
 
             // Per-cell arrays
-            Nlocal = new float[Len];
-            Entropy = new float[Len];
+            ResourceLocal = new float[Len];
+            ComplexityMetric = new float[Len];
             V = new float[Len];
             Active = new byte[Len];
 
             Incoming = new float[Len];
-            EntropyNext = new float[Len];
-            IsVacuum = new bool[Len];
+            ComplexityNext = new float[Len];
+            IsInactive = new bool[Len];
 
-            FieldPresent = new bool[Len];
-            FieldFirstTick = new int[Len];
-            EnergyFirstTick = new int[Len];
+            ActiveRegion = new bool[Len];
+            RegionActivationTick = new int[Len];
+            ResourceFirstTick = new int[Len];
 
-            IsBlackHole = new bool[Len];
-            BlackHoleCharge = new float[Len];
+            IsSink = new bool[Len];
+            SinkCharge = new float[Len];
 
-            BlackHoleId = new int[Len];
+            SinkId = new int[Len];
 
-            ZeroEnergyTicks = new int[Len];
+            ZeroResourceTicks = new int[Len];
 
-            BlackHolePotential = new float[Len];
+            SinkPotential = new float[Len];
 
-            // Union-find arrays are indexed by BH entity id (not cell index),
+            // Union-find arrays are indexed by sink entity id (not cell index),
             // so allocate a separate capacity. We grow them if needed.
-            if (initialBlackHoleCapacity < 16) initialBlackHoleCapacity = 16;
-            BlackHoleParent = new int[initialBlackHoleCapacity];
-            BlackHoleMass = new float[initialBlackHoleCapacity];
+            if (initialSinkCapacity < 16) initialSinkCapacity = 16;
+            SinkParent = new int[initialSinkCapacity];
+            SinkMass = new float[initialSinkCapacity];
 
             Reset();
         }
@@ -100,60 +99,60 @@ namespace Assets.Scripts.Domain
         /// </summary>
         public void Reset()
         {
-            Array.Clear(Nlocal, 0, Len);
-            Array.Clear(Entropy, 0, Len);
+            Array.Clear(ResourceLocal, 0, Len);
+            Array.Clear(ComplexityMetric, 0, Len);
             Array.Clear(V, 0, Len);
             Array.Clear(Active, 0, Len);
 
             Array.Clear(Incoming, 0, Len);
-            Array.Clear(EntropyNext, 0, Len);
-            Array.Clear(IsVacuum, 0, Len);
+            Array.Clear(ComplexityNext, 0, Len);
+            Array.Clear(IsInactive, 0, Len);
 
-            Array.Clear(FieldPresent, 0, Len);
-            Array.Clear(IsBlackHole, 0, Len);
-            Array.Clear(BlackHoleCharge, 0, Len);
-            Array.Clear(BlackHoleId, 0, Len);
+            Array.Clear(ActiveRegion, 0, Len);
+            Array.Clear(IsSink, 0, Len);
+            Array.Clear(SinkCharge, 0, Len);
+            Array.Clear(SinkId, 0, Len);
 
-            Array.Clear(ZeroEnergyTicks, 0, Len);
-            Array.Clear(BlackHolePotential, 0, Len);
+            Array.Clear(ZeroResourceTicks, 0, Len);
+            Array.Clear(SinkPotential, 0, Len);
 
             for (int i = 0; i < Len; i++)
             {
-                FieldFirstTick[i] = -1;
-                EnergyFirstTick[i] = -1;
+                RegionActivationTick[i] = -1;
+                ResourceFirstTick[i] = -1;
             }
 
-            // Reset BH entities
-            NextBlackHoleId = 1;
-            Array.Clear(BlackHoleParent, 0, BlackHoleParent.Length);
-            Array.Clear(BlackHoleMass, 0, BlackHoleMass.Length);
+            // Reset sink entities
+            NextSinkId = 1;
+            Array.Clear(SinkParent, 0, SinkParent.Length);
+            Array.Clear(SinkMass, 0, SinkMass.Length);
         }
 
         /// <summary>
-        /// Ensure the union-find arrays can hold a BH entity id of at least 'requiredId'.
+        /// Ensure the union-find arrays can hold a sink entity id of at least 'requiredId'.
         /// </summary>
-        public void EnsureBlackHoleCapacity(int requiredId)
+        public void EnsureSinkCapacity(int requiredId)
         {
-            if (requiredId < BlackHoleParent.Length) return;
+            if (requiredId < SinkParent.Length) return;
 
-            int newCap = BlackHoleParent.Length;
+            int newCap = SinkParent.Length;
             while (newCap <= requiredId) newCap *= 2;
 
-            Array.Resize(ref BlackHoleParent, newCap);
-            Array.Resize(ref BlackHoleMass, newCap);
+            Array.Resize(ref SinkParent, newCap);
+            Array.Resize(ref SinkMass, newCap);
         }
 
         /// <summary>
-        /// Convenience: create a new BH entity id (root), with initial mass.
-        /// Caller still needs to mark IsBlackHole[cell]=true and BlackHoleId[cell]=id.
+        /// Convenience: create a new sink entity id (root), with initial mass.
+        /// Caller still needs to mark IsSink[cell]=true and SinkId[cell]=id.
         /// </summary>
-        public int CreateBlackHoleEntity(float initialMass = 1f)
+        public int CreateSinkEntity(float initialMass = 1f)
         {
-            int id = NextBlackHoleId++;
-            EnsureBlackHoleCapacity(id + 1);
+            int id = NextSinkId++;
+            EnsureSinkCapacity(id + 1);
 
-            BlackHoleParent[id] = id;                 // root
-            BlackHoleMass[id] = Math.Max(1f, initialMass);
+            SinkParent[id] = id;                 // root
+            SinkMass[id] = Math.Max(1f, initialMass);
 
             return id;
         }

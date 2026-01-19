@@ -6,23 +6,22 @@ namespace Assets.Scripts.Events
     public static class Pass2
     {
         /// <summary>
-        /// Apply incoming energy, update entropy/viability/active flags, and enforce hard constraints.
-        /// IMPORTANT: This pass must NOT destroy black holes or allow normal physics to operate outside FieldPresent.
+        /// Apply incoming resource flow, update complexity/viability/active flags, and enforce hard constraints.
         /// </summary>
         public static void ApplyAndViability(
             Func<int, int, int> Idx,
             int width, int height,
-            float[] Nlocal, float[] Entropy, float[] V, byte[] Active, bool[] IsVacuum,
-            float[] incoming, int[] zeroEnergyTicks,
+            float[] ResourceLocal, float[] ComplexityMetric, float[] V, byte[] Active, bool[] IsInactive,
+            float[] incoming, int[] zeroResourceTicks,
             float MinBudgetToPropagate, float ActivationCost,
-            ref float NGlobal, float NlocalMax,
-            float EntropyGainPerUse, float DecayLoss, float EntropyPenalty, // EntropyPenalty kept for compatibility; not used as "disorder" here
-            float VacuumEventProbability, float VacuumEventEntropy,
+            ref float ResourceGlobal, float ResourceLocalMax,
+            float ComplexityGainPerUse, float DecayLoss, float ComplexityPenalty,
+            float PerturbationProbability, float PerturbationComplexity,
             Func<float, float, float, float> ComputeViability,
             Func<int, int> CountPersistenceConfigurations,
             int GridWidth, float PropagateFrac,
-            bool[] FieldPresent, bool[] IsBlackHole,
-            int[] FieldFirstTick, int[] EnergyFirstTick,
+            bool[] ActiveRegion, bool[] IsSink,
+            int[] RegionActivationTick, int[] ResourceFirstTick,
             int tick
         )
         {
@@ -38,35 +37,31 @@ namespace Assets.Scripts.Events
                 {
                     int i = Idx(x, y);
 
-                    // ---- BLACK HOLE: collapsed configuration space ----
-                    // These are stable geometric constraints, NOT energy drains.
-                    // Energy cannot exist here (no valid configuration).
-                    if (IsBlackHole[i])
+                    // ---- SINK REGIONS: no state transitions possible ----
+                    if (IsSink[i])
                     {
-                        Nlocal[i] = 0f;
-                        Entropy[i] = 1f; // maximum entropy (collapsed)
+                        ResourceLocal[i] = 0f;
+                        ComplexityMetric[i] = 1f; // maximum complexity (no viable configurations)
                         V[i] = 0f;
                         Active[i] = 0;
                         incoming[i] = 0f;
                         continue;
                     }
 
-                    // ---- FIELD GATING ----
-                    // If no field/configuration space, no normal evolution.
-                    // If energy ends up here (should be rare), drop it to 0 and optionally count it.
-                    if (!FieldPresent[i])
+                    // ---- REGION GATING ----
+                    // If no active region (no state transition substrate), no evolution.
+                    if (!ActiveRegion[i])
                     {
-                        // Hard rule: energy cannot persist without field space.
-                        Nlocal[i] = 0f;
+                        // Hard rule: resource cannot persist without active region.
+                        ResourceLocal[i] = 0f;
                         V[i] = 0f;
                         Active[i] = 0;
                         incoming[i] = 0f;
-                        // Entropy can be left unchanged or decayed; simplest: keep as-is
                         continue;
                     }
 
-                    // ---- VACUUM ----
-                    if (IsVacuum[i])
+                    // ---- PERMANENTLY INACTIVE ----
+                    if (IsInactive[i])
                     {
                         incoming[i] = 0f;
                         V[i] = 0f;
@@ -74,39 +69,38 @@ namespace Assets.Scripts.Events
                         continue;
                     }
 
-                    // ---- APPLY INFLOW (always) ----
+                    // ---- APPLY INFLOW ----
                     float inFlow = incoming[i];
 
                     if (inFlow > 0f)
                     {
-                        Nlocal[i] = Mathf.Min(NlocalMax, Nlocal[i] + inFlow);
-                        if (EnergyFirstTick[i] == -1) EnergyFirstTick[i] = tick;
+                        ResourceLocal[i] = Mathf.Min(ResourceLocalMax, ResourceLocal[i] + inFlow);
+                        if (ResourceFirstTick[i] == -1) ResourceFirstTick[i] = tick;
                     }
 
-                    // Clear incoming buffer for next tick usage (optional; safe)
+                    // Clear incoming buffer for next tick
                     incoming[i] = 0f;
 
                     // ---- ACTIVATION COST (global pool) ----
-                    // Only charge global pool when turning on from inactive due to positive inflow.
-                    if (Active[i] == 0 && inFlow > 0f && NGlobal > 0f)
+                    // Charge global pool when turning on from inactive due to positive inflow.
+                    if (Active[i] == 0 && inFlow > 0f && ResourceGlobal > 0f)
                     {
-                        float draw = Mathf.Min(ActivationCost, NGlobal);
-                        NGlobal -= draw;
+                        float draw = Mathf.Min(ActivationCost, ResourceGlobal);
+                        ResourceGlobal -= draw;
 
-                        // Optional: treat draw as additional local usable energy.
-                        // This makes activation meaningful. If you don't want this, comment it out.
-                        Nlocal[i] = Mathf.Min(NlocalMax, Nlocal[i] + draw);
+                        // Treat draw as additional local usable resource
+                        ResourceLocal[i] = Mathf.Min(ResourceLocalMax, ResourceLocal[i] + draw);
                     }
 
-                    // ---- "ENTROPY AS COMPLEXITY" ----
+                    // ---- COMPLEXITY METRIC ----
                     // Part A: persistence configuration count -> normalized [0..1]
                     int persistenceConfigs = CountPersistenceConfigurations(i);
-                    float configEntropy = Mathf.Log(1 + persistenceConfigs) / Mathf.Log(1 + totalConfigs);
+                    float configComplexity = Mathf.Log(1 + persistenceConfigs) / Mathf.Log(1 + totalConfigs);
 
-                    // Part B: local gradient proxy (energy contrast with neighbours)
+                    // Part B: local gradient proxy (resource contrast with neighbours)
                     float gradSum = 0f;
                     int gradCount = 0;
-                    float nHere = Nlocal[i];
+                    float rHere = ResourceLocal[i];
 
                     for (int d = 0; d < 4; d++)
                     {
@@ -115,63 +109,54 @@ namespace Assets.Scripts.Events
                         if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
 
                         int ni = Idx(nx, ny);
-                        if (!FieldPresent[ni]) continue;
-                        if (IsBlackHole[ni]) continue;
+                        if (!ActiveRegion[ni]) continue;
+                        if (IsSink[ni]) continue;
 
-                        gradSum += Mathf.Abs(nHere - Nlocal[ni]);
+                        gradSum += Mathf.Abs(rHere - ResourceLocal[ni]);
                         gradCount++;
                     }
 
                     float grad = (gradCount > 0) ? gradSum / gradCount : 0f;
-                    // Scale gradient into [0..1] using a soft saturation curve
-                    float gradEntropy = grad / (grad + 1f); // behaves nicely without tuning
+                    // Scale gradient into [0..1] using soft saturation
+                    float gradComplexity = grad / (grad + 1f);
 
-                    // Combine into "complexity entropy"
-                    float complexityEntropy = Mathf.Clamp01(0.7f * configEntropy + 0.3f * gradEntropy);
+                    // Combine into structural complexity metric
+                    float structuralComplexity = Mathf.Clamp01(0.7f * configComplexity + 0.3f * gradComplexity);
 
-                    // Activity-scaled gain (you asked entropy should rise with complex utilisation)
-                    float activity = Mathf.Clamp01(inFlow); // inflow as activity proxy in [0..1] if small numbers
-                    Entropy[i] = Mathf.Clamp01(complexityEntropy + EntropyGainPerUse * activity);
+                    // Activity-scaled gain
+                    float activity = Mathf.Clamp01(inFlow);
+                    ComplexityMetric[i] = Mathf.Clamp01(structuralComplexity + ComplexityGainPerUse * activity);
 
-                    // ---- RANDOM VACUUM EVENTS (optional) ----
-                    // If you keep this, make it rare and meaningful.
-                    if (VacuumEventProbability > 0f && UnityEngine.Random.value < VacuumEventProbability)
+                    // ---- RANDOM PERTURBATIONS (optional) ----
+                    if (PerturbationProbability > 0f && UnityEngine.Random.value < PerturbationProbability)
                     {
-                        // Vacuum event forces local energy collapse and entropy spike
-                        Nlocal[i] = 0f;
-                        Entropy[i] = Mathf.Clamp01(Entropy[i] + VacuumEventEntropy);
+                        // Random perturbation forces local resource collapse and complexity spike
+                        ResourceLocal[i] = 0f;
+                        ComplexityMetric[i] = Mathf.Clamp01(ComplexityMetric[i] + PerturbationComplexity);
                         Active[i] = 0;
                         V[i] = 0f;
                         continue;
                     }
 
                     // ---- VIABILITY ----
-                    // Compute viability from inflow, current energy, and entropy.
-                    // If you want entropy to BOOST viability (your conceptual preference),
-                    // encode that inside ComputeViability, not here, to keep the system clean.
                     float constraintBoost = 1f;
-                    V[i] = ComputeViability(inFlow * constraintBoost, Nlocal[i], Entropy[i]);
+                    V[i] = ComputeViability(inFlow * constraintBoost, ResourceLocal[i], ComplexityMetric[i]);
                     
                     // ---- ACTIVE STATE ----
-                    // Your current practice: active if viable enough and sufficient energy.
-                    if (V[i] > 0f && Nlocal[i] > MinBudgetToPropagate)
+                    if (V[i] > 0f && ResourceLocal[i] > MinBudgetToPropagate)
                         Active[i] = 1;
                     else
                         Active[i] = 0;
 
                     // ---- BASELINE DECAY ----
-                    // Decay happens after viability (so viability sees current Nlocal).
                     if (DecayLoss > 0f)
-                        Nlocal[i] = Mathf.Max(0f, Nlocal[i] - DecayLoss);
+                        ResourceLocal[i] = Mathf.Max(0f, ResourceLocal[i] - DecayLoss);
 
-                    // ---- ZERO ENERGY TICKS (vacuum eligibility) ----
-                    if (Nlocal[i] <= 0f)
-                        zeroEnergyTicks[i]++;
+                    // ---- ZERO RESOURCE TICKS ----
+                    if (ResourceLocal[i] <= 0f)
+                        zeroResourceTicks[i]++;
                     else
-                        zeroEnergyTicks[i] = 0;
-
-                    // Optional: promote to vacuum after sustained zero
-                    // if (zeroEnergyTicks[i] > 20) IsVacuum[i] = true;
+                        zeroResourceTicks[i] = 0;
                 }
             }
         }

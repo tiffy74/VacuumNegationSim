@@ -1,10 +1,10 @@
-﻿using Assets.Scripts.Domain;
+using Assets.Scripts.Domain;
 using System;
 using UnityEngine;
 
 namespace Assets.Scripts.Events
 {
-    public static class BlackHoles
+    public static class SinkRegions
     {
         public static float LastDrained { get; private set; }
         public static float LastDrainedThisTick { get; private set; }
@@ -25,25 +25,25 @@ namespace Assets.Scripts.Events
             return id;
         }
 
-        public static void ComputePotential(GridState s, int radius, float scale)
+        public static void ComputePotential(StateGrid s, int radius, float scale)
         {
             // Clear potential
-            Array.Clear(s.BlackHolePotential, 0, s.BlackHolePotential.Length);
+            Array.Clear(s.SinkPotential, 0, s.SinkPotential.Length);
             if (radius <= 0 || scale <= 0f) return;
 
-            // We treat each BH cell's root mass as the "source strength"
+            // We treat each sink cell's root mass as the "source strength"
             // and spread it out with a simple 1/(1+dist) kernel (Manhattan dist).
             for (int by = 0; by < s.H; by++)
             {
                 for (int bx = 0; bx < s.W; bx++)
                 {
                     int bIdx = s.Idx(bx, by);
-                    if (!s.IsBlackHole[bIdx]) continue;
+                    if (!s.IsSink[bIdx]) continue;
 
-                    int root = GetRootAtCell(bIdx, s.BlackHoleId, s.BlackHoleParent);
+                    int root = GetRootAtCell(bIdx, s.SinkId, s.SinkParent);
                     float mass = 1f;
-                    if (root > 0 && root < s.BlackHoleMass.Length)
-                        mass = Mathf.Max(1f, s.BlackHoleMass[root]);
+                    if (root > 0 && root < s.SinkMass.Length)
+                        mass = Mathf.Max(1f, s.SinkMass[root]);
 
                     // Spread influence within radius
                     for (int dy = -radius; dy <= radius; dy++)
@@ -59,7 +59,7 @@ namespace Assets.Scripts.Events
 
                             int dist = Mathf.Abs(dx) + Mathf.Abs(dy);
                             float contrib = (mass / (1f + dist)) * scale;
-                            s.BlackHolePotential[s.Idx(x, y)] += contrib;
+                            s.SinkPotential[s.Idx(x, y)] += contrib;
                         }
                     }
                 }
@@ -88,19 +88,20 @@ namespace Assets.Scripts.Events
             mass[rb] = 0f;
             return ra;
         }
-        public static void GrowBlackHoles(GridState s)
+
+        public static void ExpandSinkRegions(StateGrid s)
         {
-            // Next-state copy (simple, but allocates each tick)
-            bool[] next = (bool[])s.IsBlackHole.Clone();
+            // Next-state copy
+            bool[] next = (bool[])s.IsSink.Clone();
 
             for (int y = 0; y < s.H; y++)
             {
                 for (int x = 0; x < s.W; x++)
                 {
                     int i = s.Idx(x, y);
-                    if (!s.IsBlackHole[i]) continue;
+                    if (!s.IsSink[i]) continue;
 
-                    // For each neighbor of this black hole:
+                    // For each neighbor of this sink:
                     for (int d = 0; d < 4; d++)
                     {
                         int nx = x + dx[d];
@@ -109,9 +110,9 @@ namespace Assets.Scripts.Events
                             continue;
 
                         int ni = s.Idx(nx, ny);
-                        if (s.IsBlackHole[ni]) continue;
+                        if (s.IsSink[ni]) continue;
 
-                        // Count black-hole neighbors around ni
+                        // Count sink neighbors around ni
                         int count = 0;
                         for (int dd = 0; dd < 4; dd++)
                         {
@@ -121,21 +122,19 @@ namespace Assets.Scripts.Events
                                 continue;
 
                             int nni = s.Idx(nnx, nny);
-                            if (s.IsBlackHole[nni]) count++;
+                            if (s.IsSink[nni]) count++;
                         }
 
-                        // Convert if adjacent to >=2 black holes
+                        // Convert if adjacent to >=2 sinks
                         if (count >= 2)
                         {
                             next[ni] = true;
-                            //if (!next[ni])
-                            //    Debug.LogError($"BH formation failed at {ni} charge={s.BlackHoleCharge[ni]}");
                         }
                     }
                 }
             }
 
-            s.IsBlackHole = next;
+            s.IsSink = next;
 
             for (int y = 0; y < s.H; y++)
             {
@@ -143,16 +142,17 @@ namespace Assets.Scripts.Events
                 {
                     int i = s.Idx(x, y);
 
-                    // If this is a BH cell without an ID (newly grown), assign/merge it
-                    if (s.IsBlackHole[i] && s.BlackHoleId[i] == 0)
+                    // If this is a sink cell without an ID (newly grown), assign/merge it
+                    if (s.IsSink[i] && s.SinkId[i] == 0)
                     {
                         AssignOrMergeAtCell(i, s.W, s.H,
-                            s.IsBlackHole, s.BlackHoleId, s.BlackHoleParent, s.BlackHoleMass,
-                            ref s.NextBlackHoleId);
+                            s.IsSink, s.SinkId, s.SinkParent, s.SinkMass,
+                            ref s.NextSinkId);
                     }
                 }
             }
         }
+
         public static int Find(int id, int[] parent)
         {
             if (id <= 0) return 0;
@@ -164,37 +164,37 @@ namespace Assets.Scripts.Events
             return id;
         }
 
-        public static int GetRootAtCell(int idx, int[] blackHoleId, int[] blackHoleParent)
+        public static int GetRootAtCell(int idx, int[] sinkId, int[] sinkParent)
         {
-            int id = (idx >= 0 && idx < blackHoleId.Length) ? blackHoleId[idx] : 0;
-            return Find(id, blackHoleParent);
+            int id = (idx >= 0 && idx < sinkId.Length) ? sinkId[idx] : 0;
+            return Find(id, sinkParent);
         }
 
         public static int AssignOrMergeAtCell(int idx, int width, int height,
-            bool[] isBlackHole, int[] blackHoleId, int[] blackHoleParent, float[] blackHoleMass, ref int nextBlackHoleId)
+            bool[] isSink, int[] sinkId, int[] sinkParent, float[] sinkMass, ref int nextSinkId)
         {
-            int EnsureIdForCell(int idx, int[] blackHoleId, int[] blackHoleParent, float[] blackHoleMass, ref int nextBlackHoleId)
+            int EnsureIdForCell(int idx, int[] sinkId, int[] sinkParent, float[] sinkMass, ref int nextSinkId)
             {
-                if (blackHoleId[idx] > 0)
+                if (sinkId[idx] > 0)
                 {
-                    return Find(blackHoleId[idx], blackHoleParent);
+                    return Find(sinkId[idx], sinkParent);
                 }
 
-                int newId = nextBlackHoleId;
-                nextBlackHoleId++;
-                blackHoleParent[newId] = newId;
-                blackHoleMass[newId] = blackHoleMass[newId]; // no-op but explicit
-                blackHoleId[idx] = newId;
+                int newId = nextSinkId;
+                nextSinkId++;
+                sinkParent[newId] = newId;
+                sinkMass[newId] = sinkMass[newId]; // no-op but explicit
+                sinkId[idx] = newId;
                 return newId;
             }
 
             int x = idx % width;
             int y = idx / width;
 
-            // If already BH, ensure it has an id and merge with adjacent BHs
-            if (isBlackHole[idx])
+            // If already sink, ensure it has an id and merge with adjacent sinks
+            if (isSink[idx])
             {
-                int root = EnsureIdForCell(idx, blackHoleId, blackHoleParent, blackHoleMass, ref nextBlackHoleId);
+                int root = EnsureIdForCell(idx, sinkId, sinkParent, sinkMass, ref nextSinkId);
 
                 for (int d = 0; d < 4; d++)
                 {
@@ -204,18 +204,18 @@ namespace Assets.Scripts.Events
                         continue;
 
                     int nIdx = ny * width + nx;
-                    if (!isBlackHole[nIdx]) continue;
+                    if (!isSink[nIdx]) continue;
 
-                    int nRoot = Find(blackHoleId[nIdx], blackHoleParent);
+                    int nRoot = Find(sinkId[nIdx], sinkParent);
                     if (nRoot == 0) continue;
-                    root = Union(blackHoleParent, blackHoleMass, root, nRoot);
+                    root = Union(sinkParent, sinkMass, root, nRoot);
                 }
 
-                blackHoleId[idx] = root;
+                sinkId[idx] = root;
                 return root;
             }
 
-            // Not a BH yet: create and merge with adjacent BHs if any
+            // Not a sink yet: create and merge with adjacent sinks if any
             int chosenRoot = 0;
             for (int d = 0; d < 4; d++)
             {
@@ -225,27 +225,27 @@ namespace Assets.Scripts.Events
                     continue;
 
                 int nIdx = ny * width + nx;
-                if (!isBlackHole[nIdx]) continue;
+                if (!isSink[nIdx]) continue;
 
-                int nRoot = Find(blackHoleId[nIdx], blackHoleParent);
+                int nRoot = Find(sinkId[nIdx], sinkParent);
                 if (nRoot == 0) continue;
 
                 if (chosenRoot == 0) chosenRoot = nRoot;
-                else chosenRoot = Union(blackHoleParent, blackHoleMass, chosenRoot, nRoot);
+                else chosenRoot = Union(sinkParent, sinkMass, chosenRoot, nRoot);
             }
 
             if (chosenRoot == 0)
             {
-                chosenRoot = nextBlackHoleId++;
-                blackHoleParent[chosenRoot] = chosenRoot;
+                chosenRoot = nextSinkId++;
+                sinkParent[chosenRoot] = chosenRoot;
             }
 
-            isBlackHole[idx] = true;
-            blackHoleId[idx] = chosenRoot;
+            isSink[idx] = true;
+            sinkId[idx] = chosenRoot;
             return chosenRoot;
         }
 
-        public static float BlackHoleAttractEnergy(GridState s, float absorbFracPerTick = 0f, bool fieldOnly = false, float blackHoleRecoilFrac = 0f)
+        public static float SinkAbsorbResource(StateGrid s, float absorbFracPerTick = 0f, bool activeRegionOnly = false, float sinkRecoilFrac = 0f)
         {
             absorbFracPerTick = Mathf.Clamp01(absorbFracPerTick); 
             float drainedTotal = 0f;
@@ -257,13 +257,13 @@ namespace Assets.Scripts.Events
                 for (int x = 0; x < s.W; x++)
                 {
                     int i = s.Idx(x, y);
-                    if (!s.IsBlackHole[i]) continue;
+                    if (!s.IsSink[i]) continue;
 
-                    s.Nlocal[i] = 0f;
-                    s.Entropy[i] = 1f;
+                    s.ResourceLocal[i] = 0f;
+                    s.ComplexityMetric[i] = 1f;
                     s.Active[i] = 0;
 
-                    int root = FindRoot(s.BlackHoleParent, s.BlackHoleId[i]);
+                    int root = FindRoot(s.SinkParent, s.SinkId[i]);
 
                     for (int d = 0; d < 4; d++)
                     {
@@ -273,31 +273,31 @@ namespace Assets.Scripts.Events
                             continue;
 
                         int ni = s.Idx(nx, ny);
-                        if (s.IsBlackHole[ni]) continue;
-                        if (fieldOnly && !s.FieldPresent[ni]) continue;
+                        if (s.IsSink[ni]) continue;
+                        if (activeRegionOnly && !s.ActiveRegion[ni]) continue;
 
-                        float neighbourEnergy = s.Nlocal[ni];
-                        if (neighbourEnergy <= 0f) continue;
+                        float neighbourResource = s.ResourceLocal[ni];
+                        if (neighbourResource <= 0f) continue;
 
-                        float absorbed = neighbourEnergy * absorbFracPerTick;
-                        s.Nlocal[ni] = neighbourEnergy - absorbed;
+                        float absorbed = neighbourResource * absorbFracPerTick;
+                        s.ResourceLocal[ni] = neighbourResource - absorbed;
                         drainedTotal += absorbed;
                         drainedEdges++;
                         if (root > 0)
-                            s.BlackHoleMass[root] += absorbed;
+                            s.SinkMass[root] += absorbed;
                     }
                 }
             }
 
-            if (blackHoleRecoilFrac > 0f && drainedTotal > 0f)
+            if (sinkRecoilFrac > 0f && drainedTotal > 0f)
             {
-                float recoilShare = drainedTotal * blackHoleRecoilFrac / 4f;
+                float recoilShare = drainedTotal * sinkRecoilFrac / 4f;
                 for (int y = 0; y < s.H; y++)
                 {
                     for (int x = 0; x < s.W; x++)
                     {
                         int i = s.Idx(x, y);
-                        if (!s.IsBlackHole[i]) continue;
+                        if (!s.IsSink[i]) continue;
 
                         for (int d = 0; d < 4; d++)
                         {
@@ -307,8 +307,8 @@ namespace Assets.Scripts.Events
                                 continue;
 
                             int ni = s.Idx(nx, ny);
-                            if (s.IsBlackHole[ni]) continue;
-                            if (!s.FieldPresent[ni]) continue;
+                            if (s.IsSink[ni]) continue;
+                            if (!s.ActiveRegion[ni]) continue;
 
                             s.Incoming[ni] += recoilShare;
                             recoilTotal += recoilShare;
