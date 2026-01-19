@@ -7,39 +7,35 @@ public class SimulationUIController : MonoBehaviour
 {
     public SimulationController simController;
     public GameObject OverlayPanel;
-    public TMP_InputField NGlobalMaxInput;
-    public TMP_InputField NGlobalInput;
+    public TMP_InputField ResourceGlobalMaxInput;
+    public TMP_InputField ResourceGlobalInput;
 
-    // public TMP_InputField GlobalReplenishPerTickInput;
-    public TMP_InputField MinEnergyForPersistenceInput;
+    public TMP_InputField MinResourceForPersistenceInput;
 
     public TMP_InputField EthreshBaseInput;
     public TMP_InputField GlobalScarcityKInput;
-    public TMP_InputField EntropyPenaltyInput;
+    public TMP_InputField ComplexityPenaltyInput;
     public TMP_InputField DecayLossInput;
 
     public TMP_InputField MinBudgetToPropagateInput;
     public TMP_InputField ActivationCostInput;
     public TMP_InputField PropagateFracInput;
 
-    public TMP_InputField EntropyGainPerUseInput;
-    public TMP_InputField EntropyDiffuseRateInput;
+    public TMP_InputField ComplexityGainPerUseInput;
+    public TMP_InputField ComplexityDiffusionRateInput;
+    public TMP_InputField ComplexityDecayInput;
 
-    public TMP_InputField EntropyDecayInput;
-
-    public TMP_InputField NlocalMaxInput;
-    public TMP_InputField VacuumEventProbabilityInput;
-    public TMP_InputField VacuumEventEntropyInput;
+    public TMP_InputField ResourceLocalMaxInput;
+    public TMP_InputField PerturbationProbabilityInput;
+    public TMP_InputField PerturbationComplexityInput;
 
     public TMP_Text CellCountText;
     public TMP_Text ViableCellCountText;
     public TMP_Text ActiveCellCountText;
-    public TMP_Text AvgEnergyText;
-    public TMP_Text AvgEntropyText;
-    public TMP_Text NGlobalText;
+    public TMP_Text AvgResourceText;
+    public TMP_Text AvgComplexityText;
+    public TMP_Text ResourceGlobalText;
     public TMP_Text TickText;
-
-    //public TMP_InputField NlocalMaxInput;
 
     public Button PauseButton;
     public Button PlayButton;
@@ -50,33 +46,16 @@ public class SimulationUIController : MonoBehaviour
 
     void Start()
     {
-             
         // Controls
-
-        // Play Button
         PlayButton.onClick.AddListener(() => simController.Play());
-
-        // Fix: Use lambda to call RestartAndResume, which is defined in Update (should be moved to class scope)
         RestartButton.onClick.AddListener(() => RestartAndResume());
-
-        // Pause Button
         PauseButton.onClick.AddListener(() => simController.Pause());
-
-        // Restart Button
-        RestartButton.onClick.AddListener(() => simController.RestartSimulation());
-
-        // Exit Button
-        ExitButton.onClick.AddListener(() => ExitApplication()); // Add this 
-
+        ExitButton.onClick.AddListener(() => ExitApplication());
         PanelButton.onClick.AddListener(TogglePanel);
-        
-        
-
 
         OverlayPanel.SetActive(true);
     }
 
-    // Move these methods to class scope so they are accessible
     void TogglePanel()
     {
         OverlayPanel.SetActive(!OverlayPanel.activeSelf);
@@ -85,52 +64,59 @@ public class SimulationUIController : MonoBehaviour
     void RestartAndResume()
     {
         simController.RestartSimulation();
-        simController.Play(); // Immediately resume simulation after restart
+        simController.Play();
     }
 
     void ExitApplication()
     {
         Debug.Log("Exiting application...");
 #if UNITY_EDITOR
-        // Stop play mode in the Unity Editor
         UnityEditor.EditorApplication.isPlaying = false;
 #else
-        // Quit the application in standalone builds
         Application.Quit();
 #endif
     }
 
     void Update()
     {
-        //    if (OverlayPanel.activeSelf)
-        //    {
-        //        int cellCount = simController.Grid.Width * simController.Grid.Height;
-        //        int viableCount = 0;
-        //        int activeCount = 0;
-        //        double totalEnergy = 0;
-        //        double totalEntropy = 0;
+        // Uncomment and update this section when you want to display live stats
+        // Note: SimulationController no longer exposes arrays directly
+        // You'll need to access them through simController.state (StateGrid)
+        
+        // Example implementation:
+        /*
+        if (OverlayPanel.activeSelf && simController.state != null)
+        {
+            var state = simController.state;
+            var ctx = simController.ctx;
+            
+            int cellCount = state.Len;
+            int viableCount = 0;
+            int activeCount = 0;
+            double totalResource = 0;
+            double totalComplexity = 0;
 
-        //        for (int i = 0; i < simController.Nlocal.Length; i++)
-        //        {
-        //            if (simController.Nlocal[i] > simController.MinEnergyForPersistence)
-        //                viableCount++;
-        //            if (simController.Active[i] == 1)
-        //                activeCount++;
-        //            totalEnergy += simController.Nlocal[i];
-        //            totalEntropy += simController.Entropy[i];
-        //        }
+            for (int i = 0; i < state.Len; i++)
+            {
+                if (state.ResourceLocal[i] > simController.MinResourceForPersistence)
+                    viableCount++;
+                if (state.Active[i] == 1)
+                    activeCount++;
+                totalResource += state.ResourceLocal[i];
+                totalComplexity += state.ComplexityMetric[i];
+            }
 
-        //        double avgEnergy = totalEnergy / cellCount;
-        //        double avgEntropy = totalEntropy / cellCount;
+            double avgResource = totalResource / cellCount;
+            double avgComplexity = totalComplexity / cellCount;
 
-        //        CellCountText.text = $"Total Cells: {cellCount}";
-        //        ViableCellCountText.text = $"Viable Cells: {viableCount}";
-        //        ActiveCellCountText.text = $"Active Cells: {activeCount}";
-        //        AvgEnergyText.text = $"Avg Energy: {avgEnergy:F2}";
-        //        AvgEntropyText.text = $"Avg Entropy: {avgEntropy:F2}";
-        //        NGlobalText.text = $"Global Energy: {simController.NGlobal:E2}";
-        //        TickText.text = $"Tick: {simController.tick}";
-        //    }
-        //}
+            CellCountText.text = $"Total Cells: {cellCount}";
+            ViableCellCountText.text = $"Viable Cells: {viableCount}";
+            ActiveCellCountText.text = $"Active Cells: {activeCount}";
+            AvgResourceText.text = $"Avg Resource: {avgResource:F2}";
+            AvgComplexityText.text = $"Avg Complexity: {avgComplexity:F2}";
+            ResourceGlobalText.text = $"Global Resource: {ctx.ResourceGlobal:E2}";
+            TickText.text = $"Tick: {ctx.Tick}";
+        }
+        */
     }
 }

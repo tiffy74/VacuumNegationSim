@@ -1,0 +1,16 @@
+{
+    "name": "Viable.Engine",
+    "rootNamespace": "Viable.Engine",
+    "references": [
+        "GUID:b8c8f6d8e3f4a4c4a8b8c8f6d8e3f4a4"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": true
+}
