@@ -1,20 +1,15 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using UnityEngine;
-using UnityEngine.Rendering;
+using System;
+using Viable.Engine.State;
+using Viable.Engine.Execution;
 
-// [DEPRECATED - Phase 3] This file will be removed in Phase 7
-// New location: Assets/Viable/Engine/Steps/OutflowPhase.cs
-// DO NOT modify this file - changes go to new location
-
-namespace Assets.Scripts.Events
+namespace Viable.Engine.Steps
 {
-    public static class Pass1
+    /// <summary>
+    /// Phase 1: Gather outflow from active cells and distribute to neighbors.
+    /// Handles sink formation at boundaries via charge accumulation.
+    /// </summary>
+    public static class OutflowPhase
     {
-        
         static bool IsBoundaryInactive(int idx, int width, int height, bool[] activeRegion)
         {
             int x = idx % width;
@@ -44,7 +39,7 @@ namespace Assets.Scripts.Events
             int tick, out int boundaryHitsThisTick, out float maxChargeThisTick,
             bool debugForceSinkOnFirstBoundaryHit = false)
         {
-            System.Array.Clear(incoming, 0, incoming.Length);
+            Array.Clear(incoming, 0, incoming.Length);
             int newSinkCount = 0;
             boundaryHitsThisTick = 0;
             maxChargeThisTick = 0f;
@@ -75,12 +70,12 @@ namespace Assets.Scripts.Events
                         if (IsSink[nIdx])
                         {
                             // Get the ROOT of this sink (handles merged sinks)
-                            int root = SinkRegions.GetRootAtCell(nIdx, SinkId, SinkParent);
+                            int root = Logic.SinkLogic.GetRootAtCell(nIdx, SinkId, SinkParent);
                             
                             // Get the total mass of this merged sink
                             float sinkMass = 1f; // Default mass
                             if (root > 0 && root < SinkMass.Length)
-                                sinkMass = Mathf.Max(1f, SinkMass[root]);
+                                sinkMass = Math.Max(1f, SinkMass[root]);
                             
                             // Influence scales with mass
                             totalSinkInfluence += sinkMass;
@@ -106,7 +101,7 @@ namespace Assets.Scripts.Events
                     if (ResourceLocal[i] <= MinBudgetToPropagate) continue;
                     if (!(Active[i] == 1 || V[i] > -1e-3f)) continue;
 
-                    float frac = Mathf.Clamp01(PropagateFrac);
+                    float frac = Math.Clamp(PropagateFrac, 0f, 1f);
                     float available = ResourceLocal[i] * frac;
                     if (available <= 0f) continue;
 
@@ -207,7 +202,7 @@ namespace Assets.Scripts.Events
                         SinkCharge[neighborIdx] += leakPortion;
                         boundaryHitsThisTick++;
 
-                        maxChargeThisTick = Mathf.Max(maxChargeThisTick, SinkCharge[neighborIdx]);
+                        maxChargeThisTick = Math.Max(maxChargeThisTick, SinkCharge[neighborIdx]);
 
                         // Do NOT allow sink formation before tick 10 (prevents seed destruction)
                         bool allowSink = tick >= 10;
@@ -217,7 +212,7 @@ namespace Assets.Scripts.Events
                         if (shouldCreate)
                         {
                             // This automatically merges with adjacent sinks via union-find
-                            int sinkRoot = SinkRegions.AssignOrMergeAtCell(
+                            int sinkRoot = Logic.SinkLogic.AssignOrMergeAtCell(
                                 neighborIdx, width, height,
                                 IsSink, SinkId, SinkParent, SinkMass, ref NextSinkId);
                             
@@ -229,7 +224,7 @@ namespace Assets.Scripts.Events
                             if (sinkRoot > 0 && sinkRoot < SinkMass.Length)
                                 totalMass = SinkMass[sinkRoot];
 
-                            Debug.Log($"Sink created/merged at ({neighborIdx % width}, {neighborIdx / width}) tick={tick}, root={sinkRoot}, totalMass={totalMass:F2}");
+                            // Event emission instead of Debug.Log (handled by caller)
 
                             if (debugForceSinkOnFirstBoundaryHit)
                                 debugForceSinkOnFirstBoundaryHit = false;
@@ -250,17 +245,12 @@ namespace Assets.Scripts.Events
 
                     // Deduct successfully transferred resource
                     if (sentTotal > 0f)
-                        ResourceLocal[i] = Mathf.Max(0f, ResourceLocal[i] - sentTotal);
+                        ResourceLocal[i] = Math.Max(0f, ResourceLocal[i] - sentTotal);
 
                     // Accumulate blocked/leaked resource back to source (creates pressure buildup)
                     if (wouldHaveSentIntoNonActive > 0f)
                         incoming[i] += wouldHaveSentIntoNonActive;
                 }
-            }
-
-            if (tick % 20 == 0)
-            {
-                Debug.Log($"[Tick {tick}] BoundaryHits={boundaryHitsThisTick} MaxCharge={maxChargeThisTick:F4} NewSinks={newSinkCount}");
             }
 
             return newSinkCount;
@@ -282,7 +272,7 @@ namespace Assets.Scripts.Events
                     {
                         int i = Idx(x, y);
 
-                        float pulse = 0.1f * Mathf.Exp(-tick / 80f);
+                        float pulse = 0.1f * MathF.Exp(-tick / 80f);
                         // continuous inflow to the central patch
                         incoming[i] += pulse;
 

@@ -1,16 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System;
 
-// [DEPRECATED - Phase 3] This file will be removed in Phase 7
-// New location: Assets/Viable/Engine/Steps/RechargePhase.cs
-// DO NOT modify this file - changes go to new location
-
-namespace Assets.Scripts.Events
+namespace Viable.Engine.Steps
 {
-    public static class Pass3
+    /// <summary>
+    /// Phase 3: Recharge the global resource pool.
+    /// </summary>
+    public static class RechargePhase
     {
         /// <summary>
         /// Recharges the global resource pool, capping at the maximum.
@@ -24,4 +19,3 @@ namespace Assets.Scripts.Events
         }
     }
 }
-

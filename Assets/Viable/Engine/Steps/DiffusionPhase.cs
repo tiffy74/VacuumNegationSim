@@ -1,17 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using UnityEngine;
+using System;
 
-// [DEPRECATED - Phase 3] This file will be removed in Phase 7
-// New location: Assets/Viable/Engine/Steps/DiffusionPhase.cs
-// DO NOT modify this file - changes go to new location
-
-namespace Assets.Scripts.Events
+namespace Viable.Engine.Steps
 {
-    public static class Pass4
+    /// <summary>
+    /// Phase 4: Diffuse complexity metric across the grid using Laplacian operator.
+    /// </summary>
+    public static class DiffusionPhase
     {
         /// <summary>
         /// Diffuses complexity metric across the grid using a simple Laplacian, then applies decay and clamps.
@@ -22,6 +16,7 @@ namespace Assets.Scripts.Events
         /// <param name="complexityNext">Buffer for next complexity state</param>
         /// <param name="ComplexityDiffusionRate">Diffusion rate</param>
         /// <param name="ComplexityDecay">Complexity decay per tick</param>
+        /// <param name="IsSink">Sink mask (sinks have fixed complexity = 1.0)</param>
         public static void ComplexityDiffuse(
             int width, int height,
             float[] ComplexityMetric, float[] complexityNext,
@@ -50,8 +45,8 @@ namespace Assets.Scripts.Events
 
                     float lap = (n + s + w + e - 4f * c);
                     float diffused = c + ComplexityDiffusionRate * lap;
-                    diffused = Mathf.Max(0f, diffused - ComplexityDecay);
-                    complexityNext[i] = Mathf.Clamp01(diffused);
+                    diffused = Math.Max(0f, diffused - ComplexityDecay);
+                    complexityNext[i] = Math.Clamp(diffused, 0f, 1f);
                 }
             }
 

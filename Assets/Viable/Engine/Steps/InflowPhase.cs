@@ -1,16 +1,15 @@
-﻿using System;
-using UnityEngine;
+using System;
 
-// [DEPRECATED - Phase 3] This file will be removed in Phase 7
-// New location: Assets/Viable/Engine/Steps/InflowPhase.cs
-// DO NOT modify this file - changes go to new location
-
-namespace Assets.Scripts.Events
+namespace Viable.Engine.Steps
 {
-    public static class Pass2
+    /// <summary>
+    /// Phase 2: Apply incoming resource flow, update complexity/viability/active flags, and enforce constraints.
+    /// </summary>
+    public static class InflowPhase
     {
         /// <summary>
         /// Apply incoming resource flow, update complexity/viability/active flags, and enforce hard constraints.
+        /// Uses RNG from StepContext for deterministic perturbations.
         /// </summary>
         public static void ApplyAndViability(
             Func<int, int, int> Idx,
@@ -26,8 +25,8 @@ namespace Assets.Scripts.Events
             int GridWidth, float PropagateFrac,
             bool[] ActiveRegion, bool[] IsSink,
             int[] RegionActivationTick, int[] ResourceFirstTick,
-            int tick
-        )
+            int tick,
+            Random rng)
         {
             // Neighbour offsets (4-way)
             int[] dx = { 0, 0, -1, 1 };
@@ -78,7 +77,7 @@ namespace Assets.Scripts.Events
 
                     if (inFlow > 0f)
                     {
-                        ResourceLocal[i] = Mathf.Min(ResourceLocalMax, ResourceLocal[i] + inFlow);
+                        ResourceLocal[i] = Math.Min(ResourceLocalMax, ResourceLocal[i] + inFlow);
                         if (ResourceFirstTick[i] == -1) ResourceFirstTick[i] = tick;
                     }
 
@@ -89,17 +88,17 @@ namespace Assets.Scripts.Events
                     // Charge global pool when turning on from inactive due to positive inflow.
                     if (Active[i] == 0 && inFlow > 0f && ResourceGlobal > 0f)
                     {
-                        float draw = Mathf.Min(ActivationCost, ResourceGlobal);
+                        float draw = Math.Min(ActivationCost, ResourceGlobal);
                         ResourceGlobal -= draw;
 
                         // Treat draw as additional local usable resource
-                        ResourceLocal[i] = Mathf.Min(ResourceLocalMax, ResourceLocal[i] + draw);
+                        ResourceLocal[i] = Math.Min(ResourceLocalMax, ResourceLocal[i] + draw);
                     }
 
                     // ---- COMPLEXITY METRIC ----
                     // Part A: persistence configuration count -> normalized [0..1]
                     int persistenceConfigs = CountPersistenceConfigurations(i);
-                    float configComplexity = Mathf.Log(1 + persistenceConfigs) / Mathf.Log(1 + totalConfigs);
+                    float configComplexity = MathF.Log(1 + persistenceConfigs) / MathF.Log(1 + totalConfigs);
 
                     // Part B: local gradient proxy (resource contrast with neighbours)
                     float gradSum = 0f;
@@ -116,7 +115,7 @@ namespace Assets.Scripts.Events
                         if (!ActiveRegion[ni]) continue;
                         if (IsSink[ni]) continue;
 
-                        gradSum += Mathf.Abs(rHere - ResourceLocal[ni]);
+                        gradSum += Math.Abs(rHere - ResourceLocal[ni]);
                         gradCount++;
                     }
 
@@ -125,18 +124,18 @@ namespace Assets.Scripts.Events
                     float gradComplexity = grad / (grad + 1f);
 
                     // Combine into structural complexity metric
-                    float structuralComplexity = Mathf.Clamp01(0.7f * configComplexity + 0.3f * gradComplexity);
+                    float structuralComplexity = Math.Clamp(0.7f * configComplexity + 0.3f * gradComplexity, 0f, 1f);
 
                     // Activity-scaled gain
-                    float activity = Mathf.Clamp01(inFlow);
-                    ComplexityMetric[i] = Mathf.Clamp01(structuralComplexity + ComplexityGainPerUse * activity);
+                    float activity = Math.Clamp(inFlow, 0f, 1f);
+                    ComplexityMetric[i] = Math.Clamp(structuralComplexity + ComplexityGainPerUse * activity, 0f, 1f);
 
                     // ---- RANDOM PERTURBATIONS (optional) ----
-                    if (PerturbationProbability > 0f && UnityEngine.Random.value < PerturbationProbability)
+                    if (PerturbationProbability > 0f && rng.NextDouble() < PerturbationProbability)
                     {
                         // Random perturbation forces local resource collapse and complexity spike
                         ResourceLocal[i] = 0f;
-                        ComplexityMetric[i] = Mathf.Clamp01(ComplexityMetric[i] + PerturbationComplexity);
+                        ComplexityMetric[i] = Math.Clamp(ComplexityMetric[i] + PerturbationComplexity, 0f, 1f);
                         Active[i] = 0;
                         V[i] = 0f;
                         continue;
@@ -154,7 +153,7 @@ namespace Assets.Scripts.Events
 
                     // ---- BASELINE DECAY ----
                     if (DecayLoss > 0f)
-                        ResourceLocal[i] = Mathf.Max(0f, ResourceLocal[i] - DecayLoss);
+                        ResourceLocal[i] = Math.Max(0f, ResourceLocal[i] - DecayLoss);
 
                     // ---- ZERO RESOURCE TICKS ----
                     if (ResourceLocal[i] <= 0f)
