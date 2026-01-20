@@ -26,7 +26,7 @@ namespace Assets.Scripts.Events
             int GridWidth, float PropagateFrac,
             bool[] ActiveRegion, bool[] IsSink,
             int[] RegionActivationTick, int[] ResourceFirstTick,
-            int tick
+            int tick, System.Random rng
         )
         {
             // Neighbour offsets (4-way)
@@ -132,7 +132,7 @@ namespace Assets.Scripts.Events
                     ComplexityMetric[i] = Mathf.Clamp01(structuralComplexity + ComplexityGainPerUse * activity);
 
                     // ---- RANDOM PERTURBATIONS (optional) ----
-                    if (PerturbationProbability > 0f && UnityEngine.Random.value < PerturbationProbability)
+                    if (PerturbationProbability > 0f && rng.NextDouble() < PerturbationProbability)
                     {
                         // Random perturbation forces local resource collapse and complexity spike
                         ResourceLocal[i] = 0f;
