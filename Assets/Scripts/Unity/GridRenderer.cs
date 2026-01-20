@@ -1,5 +1,6 @@
 ﻿using UnityEngine;
-using Assets.Scripts.Domain;
+using Viable.Engine.State;
+using Viable.Engine.Execution;
 
 namespace Assets.Scripts.Unity
 {
@@ -43,7 +44,7 @@ namespace Assets.Scripts.Unity
         /// - Viable+active: viability coloring
         /// - Region but not viable: dormant color
         /// </summary>
-        public void Render(StateGrid s, SimContext ctx, RenderMode mode)
+        public void Render(GridState s, StepContext ctx, RenderMode mode)
         {
             // Compute per-frame maxima
             float vMax = 0f;
@@ -83,14 +84,18 @@ namespace Assets.Scripts.Unity
                     // Frontier: arrival this tick or last tick
                     bool isArrival = s.RegionActivationTick[i] == ctx.Tick || s.RegionActivationTick[i] == ctx.Tick - 1;
 
-                    // Frontier: has active region and at least one neighbour without it
+                    // Frontier: has active region and at least one neighbor without active region (but not grid boundary)
                     bool isFrontier = false;
                     if (s.ActiveRegion[i])
                     {
-                        if (x == 0 || !s.ActiveRegion[s.Idx(x - 1, y)]) isFrontier = true;
-                        else if (x == _w - 1 || !s.ActiveRegion[s.Idx(x + 1, y)]) isFrontier = true;
-                        else if (y == 0 || !s.ActiveRegion[s.Idx(x, y - 1)]) isFrontier = true;
-                        else if (y == _h - 1 || !s.ActiveRegion[s.Idx(x, y + 1)]) isFrontier = true;
+                        // Check left neighbor (not at edge)
+                        if (x > 0 && !s.ActiveRegion[s.Idx(x - 1, y)]) isFrontier = true;
+                        // Check right neighbor (not at edge)
+                        else if (x < _w - 1 && !s.ActiveRegion[s.Idx(x + 1, y)]) isFrontier = true;
+                        // Check bottom neighbor (not at edge)
+                        else if (y > 0 && !s.ActiveRegion[s.Idx(x, y - 1)]) isFrontier = true;
+                        // Check top neighbor (not at edge)
+                        else if (y < _h - 1 && !s.ActiveRegion[s.Idx(x, y + 1)]) isFrontier = true;
                     }
 
                     if (isArrival || isFrontier)
