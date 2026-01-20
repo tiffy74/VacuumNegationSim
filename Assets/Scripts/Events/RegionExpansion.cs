@@ -1,6 +1,10 @@
 using UnityEngine;
 using Assets.Scripts.Domain;
 
+// [DEPRECATED - Phase 4] This file will be removed in Phase 7
+// New location: Assets/Viable/Engine/Logic/RegionExpansionLogic.cs
+// DO NOT modify this file - changes go to new location
+
 namespace Assets.Scripts.Events
 {
     public static class RegionExpansion

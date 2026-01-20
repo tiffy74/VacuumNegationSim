@@ -4,9 +4,13 @@
 // Core union-find logic has been extracted to engine
 // =============================================
 
-using Assets.Scripts.Domain;
 using System;
 using UnityEngine;
+using Assets.Scripts.Domain;
+
+// [DEPRECATED - Phase 4] This file will be removed in Phase 7
+// New location: Assets/Viable/Engine/Logic/SinkLogic.cs
+// DO NOT modify this file - changes go to new location
 
 namespace Assets.Scripts.Events
 {

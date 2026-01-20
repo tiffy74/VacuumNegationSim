@@ -3,6 +3,10 @@ using UnityEngine;
 using Assets.Scripts.Domain;
 using Assets.Scripts.Events;
 
+// [DEPRECATED - Phase 5] This file will be removed in Phase 7
+// New location: Assets/Viable/Engine/SimulationStepper.cs
+// DO NOT modify this file - changes go to new location
+
 namespace Assets.Scripts.Simulation
 {
     public sealed class LegacyTickStep : ISimStep
