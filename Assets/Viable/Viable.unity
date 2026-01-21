@@ -222,10 +222,10 @@ MonoBehaviour:
   m_GameObject: {fileID: 1335302872}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: bea8a4b860ba68c479389e72454216d3, type: 3}
+  m_Script: {fileID: 11500000, guid: feed09909f08ba441a3eec194d8d4128, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  Grid: {fileID: 1691034524}
+  Grid: {fileID: 2137104772}
 --- !u!114 &1335302877
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -270,7 +270,7 @@ MonoBehaviour:
     m_MipBias: 0
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
---- !u!1 &1691034523
+--- !u!1 &2137104770
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -278,9 +278,9 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1691034526}
-  - component: {fileID: 1691034525}
-  - component: {fileID: 1691034524}
+  - component: {fileID: 2137104771}
+  - component: {fileID: 2137104773}
+  - component: {fileID: 2137104772}
   m_Layer: 0
   m_Name: SimulationManager
   m_TagString: Untagged
@@ -288,34 +288,51 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1691034524
+--- !u!4 &2137104771
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2137104770}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 7.30309, y: 9.93968, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2137104772
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1691034523}
+  m_GameObject: {fileID: 2137104770}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 12f42f8024d55f24e9213de644d2e1da, type: 3}
+  m_Script: {fileID: 11500000, guid: f2a5c5d5e2a09c148bc2e49082afcc7a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   Width: 128
   Height: 128
   CellPrefab: {fileID: 3393315673573950992, guid: cf7b32bdc04983848b884ca2783d3e8c, type: 3}
   CellSize: 0.1
---- !u!114 &1691034525
+--- !u!114 &2137104773
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1691034523}
+  m_GameObject: {fileID: 2137104770}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5c3507d525883e04e80218d928e6e582, type: 3}
+  m_Script: {fileID: 11500000, guid: 548d06c545173e148b077bb25dcacc95, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  scenarioPreset: {fileID: 11400000, guid: e79e7bc672cc60f4eb71de1ce3c6756c, type: 2}
+  allowInspectorOverride: 0
   ResourceGlobalMax: 50000000
   ResourceGlobal: 10000000
   GlobalReplenishPerTick: 200
@@ -344,34 +361,19 @@ MonoBehaviour:
   RequireViabilityForRegion: 0
   SeedResourceOnRegionExpansion: 1
   RegionSeedResource: 0.1
+  SinkFormationThreshold: 0.5
+  SinkDrainFraction: 0
+  SinkRecoilFraction: 0
   InactiveColor: {r: 0.05, g: 0.05, b: 0.08, a: 1}
   ShowComplexityTint: 0
   DormantRegionColor: {r: 0.15, g: 0, b: 0.25, a: 1}
   ScaleFactor: 1
-  renderMode: 0
   ticksPerSecond: 10
-  Grid: {fileID: 1691034524}
-  SinkFormationThreshold: 0.5
-  SinkDrainFraction: 0
-  SinkRecoilFraction: 0
---- !u!4 &1691034526
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1691034523}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 539.906, y: 241.21172, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  renderMode: 0
+  Grid: {fileID: 2137104772}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
   - {fileID: 1335302875}
-  - {fileID: 1691034526}
+  - {fileID: 2137104771}

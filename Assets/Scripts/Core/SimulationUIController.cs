@@ -2,10 +2,11 @@
 using TMPro;
 using UnityEngine.UI;
 using System;
+using Viable.Core.Unity.Controllers; // ADDED: Reference to new namespace
 
 public class SimulationUIController : MonoBehaviour
 {
-    public SimulationController simController;
+    public SimulationController simController; // Now finds the Core.Unity version
     public GameObject OverlayPanel;
     public TMP_InputField ResourceGlobalMaxInput;
     public TMP_InputField ResourceGlobalInput;
@@ -80,42 +81,23 @@ public class SimulationUIController : MonoBehaviour
     void Update()
     {
         // Uncomment and update this section when you want to display live stats
-        // Note: SimulationController no longer exposes arrays directly
-        // You'll need to access them through simController.state (StateGrid)
+        // Note: SimulationController state is now private
+        // For Stage 12 (UI), we'll add public accessors for stats
         
-        // Example implementation:
+        // Example implementation (will be enabled in Stage 12):
         /*
-        if (OverlayPanel.activeSelf && simController.state != null)
+        if (OverlayPanel.activeSelf && simController != null)
         {
-            var state = simController.state;
-            var ctx = simController.ctx;
+            // TODO Stage 12: Add GetSimulationStats() method to SimulationController
+            // var stats = simController.GetSimulationStats();
             
-            int cellCount = state.Len;
-            int viableCount = 0;
-            int activeCount = 0;
-            double totalResource = 0;
-            double totalComplexity = 0;
-
-            for (int i = 0; i < state.Len; i++)
-            {
-                if (state.ResourceLocal[i] > simController.MinResourceForPersistence)
-                    viableCount++;
-                if (state.Active[i] == 1)
-                    activeCount++;
-                totalResource += state.ResourceLocal[i];
-                totalComplexity += state.ComplexityMetric[i];
-            }
-
-            double avgResource = totalResource / cellCount;
-            double avgComplexity = totalComplexity / cellCount;
-
-            CellCountText.text = $"Total Cells: {cellCount}";
-            ViableCellCountText.text = $"Viable Cells: {viableCount}";
-            ActiveCellCountText.text = $"Active Cells: {activeCount}";
-            AvgResourceText.text = $"Avg Resource: {avgResource:F2}";
-            AvgComplexityText.text = $"Avg Complexity: {avgComplexity:F2}";
-            ResourceGlobalText.text = $"Global Resource: {ctx.ResourceGlobal:E2}";
-            TickText.text = $"Tick: {ctx.Tick}";
+            // CellCountText.text = $"Total Cells: {stats.TotalCells}";
+            // ViableCellCountText.text = $"Viable Cells: {stats.ViableCount}";
+            // ActiveCellCountText.text = $"Active Cells: {stats.ActiveCount}";
+            // AvgResourceText.text = $"Avg Resource: {stats.AvgResource:F2}";
+            // AvgComplexityText.text = $"Avg Complexity: {stats.AvgComplexity:F2}";
+            // ResourceGlobalText.text = $"Global Resource: {stats.ResourceGlobal:E2}";
+            // TickText.text = $"Tick: {stats.Tick}";
         }
         */
     }

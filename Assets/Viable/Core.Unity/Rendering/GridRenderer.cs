@@ -1,8 +1,9 @@
-﻿using UnityEngine;
+using UnityEngine;
 using Viable.Engine.State;
 using Viable.Engine.Execution;
+using Viable.Core.Unity.Visuals;
 
-namespace Assets.Scripts.Unity
+namespace Viable.Core.Unity.Rendering
 {
     public enum RenderMode
     {
@@ -11,6 +12,10 @@ namespace Assets.Scripts.Unity
         Complexity
     }
 
+    /// <summary>
+    /// Renders GridState to Unity visualization layer.
+    /// Stage 8: Moved from Assets.Scripts.Unity to Viable.Core.Unity.Rendering.
+    /// </summary>
     public sealed class GridRenderer
     {
         private readonly int _w;
