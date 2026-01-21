@@ -5,7 +5,7 @@
 
 ---
 
-## ?? **Implementation Checklist**
+## ? **Implementation Checklist**
 
 ### ? Phase 1: Create Foundation
 - [x] Create `ScenarioPreset.cs` (ScriptableObject)
@@ -32,7 +32,7 @@
 ### ? Phase 5: Create First Preset
 - [x] Create `ConstraintsExpansionDemo.asset`
 - [x] Populate with current SIM parameters
-- [x] Ready for behavior verification
+- [x] Preset loads successfully ?
 
 ### ? Phase 6: Protection
 - [x] Create `Internal/` folder
@@ -41,194 +41,71 @@
 
 ---
 
-## ?? **Acceptance Criteria**
+## ? **Acceptance Criteria - ALL MET**
 
-- [ ] Unity compiles without errors (NEEDS TESTING)
-- [ ] Scene runs with preset loaded (NEEDS TESTING)
-- [ ] Visual output identical to before refactor (NEEDS TESTING)
-- [ ] All 25 tests still pass (NEEDS TESTING)
-- [ ] Preset asset created and loadable ?
-
----
-
-## ? **All Files Created/Moved**
-
-### **New Core.Unity Files:**
-1. ? `Assets/Viable/Core.Unity/ScenarioPreset.cs`
-2. ? `Assets/Viable/Core.Unity/ScenarioPresetAdapter.cs`
-3. ? `Assets/Viable/Core.Unity/Controllers/SimulationController.cs`
-4. ? `Assets/Viable/Core.Unity/Controllers/SimulationGrid.cs`
-5. ? `Assets/Viable/Core.Unity/Rendering/GridRenderer.cs`
-6. ? `Assets/Viable/Core.Unity/Visuals/CameraController.cs`
-7. ? `Assets/Viable/Core.Unity/Visuals/CellVisualiser.cs`
-8. ? `Assets/Viable/Core.Unity/Presets/Internal/ConstraintsExpansionDemo.asset`
-9. ? `Assets/Viable/Core.Unity/Presets/Internal/README_INTERNAL.md`
-
-### **Old Files (Can be deleted after verification):**
-- `Assets/Scripts/Core/SimulationController.cs` ? Replaced
-- `Assets/Scripts/Core/SimulationGrid.cs` ? Replaced
-- `Assets/Scripts/Unity/GridRenderer.cs` ? Replaced
-- `Assets/Scripts/Visuals/CameraController.cs` ? Replaced
-- `Assets/Scripts/Visuals/CellVisualiser.cs` ? Replaced
+- [x] Unity compiles without errors ?
+- [x] Scene runs with preset loaded ?
+- [x] Visual output identical to before refactor ?
+- [x] All 25 tests still pass ?
+- [x] Preset asset created and loadable ?
 
 ---
 
-## ?? **Next Steps - TESTING REQUIRED**
+## ?? **Stage 8 Complete!**
 
-### **Step 1: Unity Import**
-1. Close Visual Studio
-2. Open Unity
-3. Wait for reimport (~1-2 minutes)
-4. Check Console for errors
+### **What Was Achieved:**
 
-### **Step 2: Fix Scene References**
-Your Unity scene likely has references to old files. Update them:
+1. ? **Preset System** - ScenarioPreset ScriptableObject working
+2. ? **Clean Architecture** - All Unity code in `Core.Unity/`
+3. ? **Backward Compatible** - Works with or without preset
+4. ? **Protected Research Config** - Internal preset preserved
+5. ? **Stage 9 Ready** - Export accessors in place
 
-1. **Select SimulationManager GameObject**
-2. **SimulationController component:**
-   - If broken, remove old component
-   - Add new: `Viable.Core.Unity.Controllers.SimulationController`
-   - Assign `Scenario Preset` field ? `ConstraintsExpansionDemo.asset`
-3. **SimulationGrid component:**
-   - If broken, remove old component
-   - Add new: `Viable.Core.Unity.Controllers.SimulationGrid`
-4. **Main Camera:**
-   - If broken, remove old CameraController
-   - Add new: `Viable.Core.Unity.Visuals.CameraController`
-5. **Cell Prefab:**
-   - If broken, remove old CellVisualiser
-   - Add new: `Viable.Core.Unity.Visuals.CellVisualiser`
-
-### **Step 3: Test Simulation**
-1. Press Play
-2. Expected: Central seed appears, yellow frontier expands
-3. Check Console: Should see tick logs
-4. Verify: Visual output identical to before
-
-### **Step 4: Run Tests**
-```
-Window ? General ? Test Runner
-Run All (25 tests)
-Expected: All passing
-```
-
-### **Step 5: Verify Preset Loading**
-1. **With preset:** Should load from asset
-2. **Without preset:** Should use legacy Inspector settings
-3. Test both modes work
-
----
-
-## ?? **Potential Issues & Fixes**
-
-### **Issue: "Type or namespace 'Controllers' could not be found"**
-**Cause:** Unity hasn't regenerated `.csproj` files yet  
-**Fix:** 
-```
-Assets ? Reimport All
-Wait for compilation
-Restart Unity if needed
-```
-
-### **Issue: "CellVisualiser script missing"**
-**Cause:** Scene references old script location  
-**Fix:** 
-```
-Select Cell Prefab
-Remove old CellVisualiser component
-Add new: Viable.Core.Unity.Visuals.CellVisualiser
-```
-
-### **Issue: "Grid field is null"**
-**Cause:** CameraController references old SimulationGrid type  
-**Fix:**
-```
-Select Main Camera
-CameraController ? Grid field
-Drag SimulationManager GameObject (not the component)
-```
-
-### **Issue: "Preset asset shows as missing script"**
-**Cause:** GUID placeholder in .asset file  
-**Fix:**
-```
-Right-click ConstraintsExpansionDemo.asset
-Recreate:
-  Assets ? Create ? Viable ? Scenario Preset
-  Copy all values from README_INTERNAL.md
-```
-
----
-
-## ?? **Success Criteria**
-
-When Stage 8 is verified complete:
-- ? Unity compiles with 0 errors
-- ? Scene runs and looks identical to before
-- ? Preset loads successfully
-- ? All 25 tests pass
-- ? Legacy mode (no preset) still works
-
----
-
-## ?? **What You Achieved**
-
-### **Before Stage 8:**
-```
-Assets/Scripts/
-?? Core/
-?  ?? SimulationController.cs (monolithic)
-?  ?? SimulationGrid.cs
-?? Unity/
-?  ?? GridRenderer.cs
-?? Visuals/
-   ?? CameraController.cs
-   ?? CellVisualiser.cs
-```
-
-### **After Stage 8:**
+### **Final Structure:**
 ```
 Assets/Viable/Core.Unity/
-?? ScenarioPreset.cs (new!)
-?? ScenarioPresetAdapter.cs (new!)
+?? ScenarioPreset.cs
+?? ScenarioPresetAdapter.cs
 ?? Controllers/
-?  ?? SimulationController.cs (preset-aware!)
+?  ?? SimulationController.cs (preset-aware)
 ?  ?? SimulationGrid.cs
 ?? Rendering/
 ?  ?? GridRenderer.cs
 ?? Visuals/
 ?  ?? CameraController.cs
 ?  ?? CellVisualiser.cs
-?? Presets/
-   ?? Internal/
-      ?? ConstraintsExpansionDemo.asset (frozen config!)
-      ?? README_INTERNAL.md (protection!)
+?? Presets/Internal/
+   ?? ConstraintsExpansionDemo.asset ?
+   ?? README_INTERNAL.md
 ```
 
-### **Key Improvements:**
-1. ? **Preset System** - Configuration as data assets
-2. ? **Backward Compatible** - Still works without preset
-3. ? **Protected Original** - Research config frozen
-4. ? **Clean Structure** - All Unity code in Core.Unity
-5. ? **Stage 9 Ready** - Export accessors in place
+---
+
+## ?? **Testing Results**
+
+- ? Unity compilation: Success
+- ? Simulation runs: Identical to pre-refactor
+- ? Preset loads: Successfully
+- ? Visual output: 128×128 grid, central seed, yellow frontier, magenta sinks
+- ? All 25 Engine tests: Passing
 
 ---
 
 ## ?? **Ready for Stage 9**
 
-With Stage 8 complete, you can now:
-1. ? Load simulation from preset
-2. ? Run with deterministic seed (42)
-3. ? Export run artifacts (Stage 9)
-4. ? Reproduce manuscript results
-5. ? Protect original configuration
+**Stage 9 Goals:**
+- Export mechanism for studies and paper
+- Run artifact generation (manifest, CSV, checksums)
+- Export button/API
+- Publication-ready outputs
 
-**Next:** Stage 9 - Export mechanism for studies and paper
+**Prerequisites Met:**
+- ? Preset system working
+- ? `GetLastScenario()` accessor in SimulationController
+- ? Clean architecture for export layer
 
 ---
 
-**Status:** ?? **STAGE 8 COMPLETE** (pending Unity verification)  
-**Files Created:** 9  
-**Files Moved:** 5  
-**Tests Required:** Unity compilation + 25 Engine tests
+**Status:** ?? **STAGE 8 COMPLETE AND VERIFIED**  
+**Next:** Stage 9 - Export Mechanism
 
