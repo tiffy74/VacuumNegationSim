@@ -4,6 +4,7 @@ using Viable.Engine.State;
 using Viable.Engine.Execution;
 using Viable.Engine.Configuration;
 using System;
+using System.Diagnostics;
 
 namespace Viable.Engine.Tests
 {
