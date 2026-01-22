@@ -1,6 +1,6 @@
-# Viable Engine - Configuration Space Simulation Framework
+# Viable Engine - Deterministic Simulation Framework
 
-**A deterministic, Unity-free simulation engine for exploring emergent spacetime geometry, black hole formation, and energy propagation through configuration space.**
+**A production-ready simulation engine for exploring emergent dynamics in resource-constrained spatial systems.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Unity Version](https://img.shields.io/badge/Unity-2022%2B-blue.svg)](https://unity.com/)
@@ -12,26 +12,98 @@
 
 ## 🎯 What Is This?
 
-**Viable Engine** is a production-ready, scientifically rigorous simulation framework for testing theoretical physics models where:
+**Viable Engine** is a deterministic simulation framework for modeling resource-constrained spatial systems where **persistence**, **propagation**, and **failure** emerge from local interactions rather than explicit rules.
 
-- **Configuration Space** is a fundamental substrate (analogous to spacetime)
-- **Energy** propagates through active regions, creating observable structures
-- **Black Holes** (sinks) form where energy accumulates at boundaries
-- **Viability** determines whether cells persist based on thermodynamic criteria
-- **Emergence** drives complex pattern formation through local rules
+### Core Mechanism
 
-### Key Features
+The system represents a **2D grid of interacting cells**. Each cell has local state (resources, activity, complexity), but dynamics are **not purely local**:
 
-✅ **100% Deterministic** - Same seed always produces identical results (verified with tests)  
-✅ **Unity-Free Engine** - Run simulations headlessly without Unity (batch processing, CI/CD)  
-✅ **Fully Tested** - 25 tests covering 75% of critical components  
-✅ **High Performance** - 1000 steps in <5 seconds on 32×32 grid  
-✅ **Clean Architecture** - Layered design with zero circular dependencies  
-✅ **Reproducible Science** - Seed-based execution for publishable research  
+- Cells exchange resources with neighbors
+- Regions merge or fragment dynamically
+- Propagation happens through redistribution and diffusion phases
+- Expansion, contraction, and collapse are **emergent consequences** of interactions
+
+On each timestep, the engine runs a fixed sequence of phases:
+1. **Outflow** - Cells send resources to neighbors
+2. **Inflow** - Cells receive resources from neighbors
+3. **Redistribution/Diffusion** - Complexity and resource gradients balance
+4. **Recharge** - Global resource pool replenishes system
+5. **Viability Evaluation** - Cells persist or fail based on maintenance costs vs. incoming resources
+
+**No optimization, no equilibrium-seeking, no goal-directed behavior.** Everything emerges from constraint, coupling, and dissipation.
 
 ---
 
-## 📊 Architecture
+## 🔬 Intended Use
+
+**This is an exploratory modeling tool** — not a physics solver, not making claims about fundamental theory.
+
+### Suitable Applications
+
+The framework is designed for domains where:
+- **Viability** determines whether entities persist or fail
+- **Resource constraints** drive system-level dynamics
+- **Spatial coupling** creates emergent patterns
+- **Persistence** depends on balancing costs and inputs
+
+**Example domains:**
+- **Ecology** - Population dynamics, resource competition, habitat fragmentation
+- **Network Science** - Cascading failures, resilience, load redistribution
+- **Urban Planning** - Infrastructure stress, service area persistence
+- **Systems Biology** - Metabolic networks, cellular resource allocation
+- **Economics** - Market dynamics, resource flow, competitive exclusion
+- **Epidemiology** - Spatial disease spread with resource constraints
+
+**Key insight:** Any field studying **how systems persist, propagate, or collapse under constraints** can use this framework as a testbed.
+
+---
+
+## ✨ Key Features
+
+### **100% Deterministic**
+- Same seed = identical results (verified with tests)
+- Reproducible science: critical for publications
+
+### **Unity-Free Engine**
+- Run simulations headlessly without Unity
+- Batch processing, CI/CD integration
+- Command-line parameter sweeps
+
+### **Clean Architecture**
+- 4-assembly structure (Contracts, Engine, Tests, Unity)
+- Zero circular dependencies
+- Unity visualization completely decoupled from simulation logic
+
+### **Export System (Stage 9)**
+- Publication-ready CSV data
+- Complete run artifacts (parameters, metrics, events)
+- SHA-256 checksums for reproducibility verification
+- Manifest with engine version, execution metadata
+
+### **Preset System (Stage 8)**
+- ScriptableObject configurations
+- Scenario management
+- Parameter versioning
+
+### **Fully Tested**
+- 25 tests covering 75% of critical components
+- Determinism verified (100-step identical runs)
+- Performance benchmarks included
+
+---
+
+## 📊 Architecture Overview
+
+### Current Status: **10 Stages Complete**
+
+| Stage | Status | What It Achieved |
+|-------|--------|------------------|
+| **Phases 1-7** | ✅ Complete | Unity-free deterministic Engine extraction |
+| **Tests** | ✅ Complete | 25 tests, 75% coverage, determinism verified |
+| **Bugfixes** | ✅ Complete | Grid boundary, camera positioning, edge cases |
+| **Stage 8** | ✅ Complete | Core.Unity productization with preset system |
+| **Stage 9** | ✅ Complete | Export system for reproducible research |
+| **Stage 10** | ✅ Complete | Terminology neutralization for broad applicability |
 
 ### Assembly Structure
 
@@ -43,36 +115,39 @@ Viable.Engine (Pure Simulation Logic - Unity-Free!)
     ├─ State/            → GridState data structure
     ├─ Configuration/    → Simulation parameters
     ├─ Execution/        → StepContext with deterministic RNG
-    ├─ Steps/            → OutflowPhase, InflowPhase, RechargePhase, DiffusionPhase
-    ├─ Logic/            → SinkLogic (union-find), RegionExpansionLogic
-    ├─ Computation/      → ViabilityCalculator
-    └─ Interfaces/       → IStepPhase
+    ├─ Steps/            → Simulation phases (Outflow, Inflow, etc.)
+    ├─ Logic/            → Helpers (SinkLogic, RegionExpansionLogic)
+    └─ Computation/      → Calculators (ViabilityCalculator)
 
 Viable.Engine.Tests (Test Suite)
     └─ 25 tests: Determinism, Viability, State, Sinks, Performance
 
-Assembly-CSharp (Unity Visualization Layer)
-    └─ SimulationController, GridRenderer, CameraController
+Viable.Core.Unity (Visualization & UI)
+    ├─ Controllers/      → SimulationController, SimulationGrid
+    ├─ Rendering/        → GridRenderer (state → visual)
+    ├─ Visuals/          → CameraController, CellVisualiser
+    ├─ Presets/          → ScenarioPreset assets
+    └─ Export/           → RunExporter, CSV/JSON writers
 ```
-
-**No Unity dependencies in Engine!** 🎉
 
 ---
 
 ## 🚀 Quick Start
 
-### 1. Run in Unity (Visual)
+### 1. Run in Unity (Visual Inspection)
 
 ```csharp
 // Already set up in SimulationController!
 // Just open Unity and press Play
 ```
 
-**Expected behavior:**
-1. Central seed appears (white 5×5 region)
-2. Yellow frontier expands outward
-3. Magenta sink regions form at boundaries
-4. Complexity halos visible around sinks (blue tint if enabled)
+**What you'll see:**
+1. Central seed region (5×5 cells)
+2. Frontier expansion (yellow boundary propagating outward)
+3. Sink formation (magenta regions at boundaries)
+4. Emergent spatial patterns from local interactions
+
+**Visual output is intentionally plain** — it's a debugging/inspection aid, not a presentation tool. The real value is in the **exported data**.
 
 ### 2. Run Headlessly (Batch Processing)
 
@@ -83,7 +158,7 @@ using Viable.Contracts;
 // Define scenario
 var scenario = new ScenarioDefinition
 {
-    ScenarioId = "test-run",
+    ScenarioId = "parameter-sweep-001",
     GridWidth = 64,
     GridHeight = 64,
     Seed = 42,  // Deterministic!
@@ -101,7 +176,7 @@ var result = runner.Run(scenario, new RunRequest
 { 
     Steps = 1000, 
     SampleEvery = 10,
-    EmitEvents = true 
+    EmitEvents = false 
 });
 
 // Analyze results
@@ -117,26 +192,55 @@ Console.WriteLine($"Execution time: {result.ExecutionTimeMs}ms");
 
 ---
 
-## 🎨 What You'll See
+## 📤 Export System (Stage 9)
 
-### Visual Color Legend
+### Export Complete Run Artifacts
+
+**In Unity:**
+1. Run simulation (Press Play)
+2. Right-click SimulationController → "Export Current Run"
+3. Check Console for export path
+
+**Output Structure:**
+```
+VIABLE_Run_2024-01-21T143055Z_abc123/
+├─ scenario.json          ← Scenario parameters
+├─ request.json           ← Run configuration
+├─ metrics.csv            ← Time-series data (Excel/R/Python ready)
+├─ summary.md             ← Human-readable report
+├─ manifest.json          ← Complete metadata (versions, execution time)
+└─ checksums.txt          ← SHA-256 hashes (reproducibility verification!)
+```
+
+### Reproducibility Verification
+
+**Critical for publications:**
+- Same seed → same checksums
+- Verifies byte-identical execution
+- Proves determinism
+
+**To verify:**
+```
+1. Run with seed 42
+2. Export → note checksums
+3. Restart, run with seed 42 again
+4. Export → compare checksums
+Result: Identical! ✅
+```
+
+---
+
+## 🎨 Visual Output
+
+### Color Legend
 
 | Color | Meaning | State |
 |-------|---------|-------|
-| 🟪 **Dark Purple/Black** | Inactive region | No active configuration space |
-| 🟨 **Yellow** | Expansion frontier | Region boundary arriving this tick |
+| 🟪 **Dark Purple** | Inactive | No active region |
+| 🟨 **Yellow** | Expansion frontier | Boundary cells arriving this tick |
 | ⬜ **White/Bright** | High viability | Active cells with positive viability |
-| 🟣 **Magenta** | Sink (black hole) | Collapsed region accumulating energy |
-| 🔵 **Blue Tint** | Complexity | Entropy/structural complexity overlay |
-
-### Typical Evolution
-
-```
-Tick 0-10:    Seed establishment (5×5 central region)
-Tick 10-50:   Rapid expansion (yellow frontier propagates)
-Tick 50-100:  Sink formation (magenta regions at boundaries)
-Tick 100+:    Stable patterns (complexity halos around sinks)
-```
+| 🟣 **Magenta** | Sink | Resource accumulation point |
+| 🔵 **Blue Tint** | Complexity | Structural complexity overlay (optional) |
 
 ---
 
@@ -160,7 +264,7 @@ Click "Run All"
 public void SameSeed_ProducesIdenticalResults_After100Steps()
 {
     // Verifies: Same seed = identical results after 100 steps
-    // All 1,024 cells match exactly: resource, viability, complexity, etc.
+    // All 16,384 cells (128×128) match exactly: resource, viability, complexity, etc.
 }
 ```
 
@@ -168,43 +272,32 @@ public void SameSeed_ProducesIdenticalResults_After100Steps()
 
 #### **Performance Benchmarks**
 ```
-32×32 grid, 1000 steps: <5 seconds ✅
-64×64 grid, 100 steps:  <2 seconds ✅
-Single step:            <50ms ✅
+32×32 grid, 1000 steps: <2s ✅
+64×64 grid, 1000 steps: <8s ✅
+128×128 grid, 100 steps: <5s ✅
 ```
-
-#### **Coverage**
-- ✅ ViabilityCalculator (5 tests)
-- ✅ DeterminismTests (3 tests)
-- ✅ GridStateTests (8 tests)
-- ✅ SinkLogicTests (6 tests)
-- ✅ PerformanceTests (3 tests)
 
 ---
 
-## 🔬 Scientific Use Cases
+## 🔬 Research Use Cases
 
 ### 1. Parameter Sweep Study
 
 ```csharp
 for (float decay = 0.001f; decay <= 0.01f; decay += 0.001f)
 {
-    var scenario = new ScenarioDefinition {
-        ScenarioId = $"decay-{decay:F3}",
-        Seed = 42,
-        Parameters = new Dictionary<string, double> {
-            ["decayLoss"] = decay
-        }
-    };
-    
+    var scenario = CreateScenario("decay", decay);
     var result = runner.Run(scenario, request);
-    int finalViable = (int)result.SummaryMetrics["viableCount"];
     
+    int finalViable = (int)result.SummaryMetrics["viableCount"];
     Console.WriteLine($"Decay={decay:F3} → ViableCells={finalViable}");
+    
+    // Export for analysis
+    exporter.Export(scenario, request, result, options);
 }
 ```
 
-**Run overnight** to explore parameter space systematically.
+**Run overnight**, analyze CSV exports in R/Python/Excel the next day.
 
 ### 2. Reproducibility Verification
 
@@ -216,198 +309,61 @@ var result1 = runner.Run(scenario, request);
 var result2 = runner.Run(scenario, request);
 
 // Verify identical
-Assert.AreEqual(result1.FinalState, result2.FinalState);
+Assert.AreEqual(result1.FinalState, result2.FinalState); // ✅
 ```
 
 **Publish with confidence** - results are 100% reproducible!
 
-### 3. Headless CI/CD Testing
+### 3. Edge Case Exploration
 
-```yaml
-# .github/workflows/engine-tests.yml
-- name: Run Engine Tests
-  run: unity-editor -runTests -testPlatform EditMode
-  
-- name: Verify Determinism
-  run: ./run_determinism_verification.sh
-```
+Push parameters into extreme regimes:
+- Very low resource replenishment → watch propagation failure
+- Very high decay → observe rapid collapse dynamics
+- Zero expansion chance → study isolated clusters
+- High perturbation → explore stochastic effects
 
-**Automate testing** on every commit!
-
----
-
-## 🧠 Conceptual Framework
-
-### Physical Analogies
-
-| **Viable Engine** | **General Relativity Analogue** | **Implementation** |
-|-------------------|--------------------------------|-------------------|
-| Configuration Space | Spacetime manifold | `ActiveRegion[i]` boolean array |
-| Energy/Resource | Matter/energy distribution | `ResourceLocal[i]` float array |
-| Sinks (Black Holes) | Event horizons | `IsSink[i]` + union-find merging |
-| Viability | Thermodynamic persistence | `V[i]` = f(inflow, decay, threshold) |
-| Complexity | Structural entropy | `ComplexityMetric[i]` from gradients |
-| Region Expansion | Horizon propagation | Probabilistic boundary activation |
-
-### Core Equations
-
-**Viability:**
-```
-V[i] = (inflow[i] × gain(complexity[i]) - decay) / threshold_effective
-```
-
-**Effective Threshold:**
-```
-threshold_eff = threshold_base × (1 + scarcityK × (1 - resourceGlobal/resourceMax))
-```
-
-**Complexity Gain:**
-```
-gain = 1 + A × (1 - exp(-K × complexity))
-```
-
----
-
-## 📐 Key Parameters
-
-### Tunable in Inspector (SimulationController)
-
-| Parameter | Default | Effect |
-|-----------|---------|--------|
-| `DecayLoss` | 0.003 | Energy loss per tick (higher = faster collapse) |
-| `EthreshBase` | 0.18 | Base viability threshold (higher = harder to persist) |
-| `GlobalScarcityK` | 0.3 | How scarcity affects threshold |
-| `PropagateFrac` | 0.25 | Energy transfer fraction to neighbors |
-| `ComplexityGainPerUse` | 0.2 | Complexity increase from resource use |
-| `RegionExpansionChance` | 0.25 | Probability of boundary expansion |
-| `SinkFormationThreshold` | 0.5 | Resource level triggering sink formation |
-
-**Experiment:** Tweak parameters and observe emergent behavior!
-
----
-
-## 🛠️ Development
-
-### Project Structure
-
-```
-Assets/
-├─ Viable/
-│  ├─ Contracts/          → DTOs (ScenarioDefinition, RunRequest, etc.)
-│  ├─ Engine/             → Pure simulation logic (Unity-free!)
-│  └─ Engine.Tests/       → Test suite (25 tests)
-│
-├─ Scripts/
-│  ├─ Core/               → SimulationController (Unity integration)
-│  ├─ Unity/              → GridRenderer (visualization)
-│  └─ Visuals/            → CameraController, CellVisualiser
-│
-└─ Documentation/
-   ├─ ENGINE_EXTRACTION_PLAN.md
-   ├─ ARCHITECTURE_PHASE*_COMPLETE.md (Phases 1-7)
-   └─ TEST_SUITE_IMPORT_INSTRUCTIONS.md
-```
-
-### Build & Test
-
-```sh
-# Build all assemblies
-dotnet build
-
-# Run tests
-unity-editor -runTests -testPlatform EditMode
-
-# Verify determinism
-# (Same seed should produce identical results)
-```
-
----
-
-## 📊 Performance Characteristics
-
-### Benchmarks (Reference: Modern Desktop)
-
-| Grid Size | Steps | Time | Throughput |
-|-----------|-------|------|------------|
-| 32×32 | 1,000 | ~2s | 500 steps/sec |
-| 64×64 | 1,000 | ~8s | 125 steps/sec |
-| 128×128 | 100 | ~5s | 20 steps/sec |
-
-**Scalability:** O(N) per step where N = grid size
-
-**Optimization opportunities:**
-- SIMD vectorization (array operations)
-- Parallel processing (independent cells)
-- Sparse grids (large empty regions)
-
----
-
-## 🔮 Future Extensions
-
-### Roadmap
-
-- [ ] **3D Support** - Extend from 2D grid to 3D volume (foam-like structures)
-- [ ] **GPU Acceleration** - Compute shaders for massive grids (1024×1024+)
-- [ ] **Multi-threading** - Parallelize step phases (4-8× speedup potential)
-- [ ] **Advanced Metrics** - Fractal dimension, spatial correlation, information flow
-- [ ] **Visualization Tools** - Web-based result viewer (Three.js)
-- [ ] **Machine Learning** - Parameter optimization via evolutionary algorithms
-
-### Research Directions
-
-- **Quantum analogues** - Wavefunction collapse from viability thresholds
-- **Cosmological inflation** - Multi-universe branching scenarios
-- **Black hole thermodynamics** - Hawking radiation simulation
-- **Gravitational waves** - Propagation through configuration space
+**No equilibrium assumptions** means you can explore truly non-equilibrium behavior.
 
 ---
 
 ## 📚 Documentation
 
-### Key Files
+### Implementation Stages
+- **[Stages 1-7](ARCHITECTURE_PHASE*_COMPLETE.md)** - Engine extraction
+- **[Stage 8](STAGE8_IMPLEMENTATION.md)** - Core.Unity preset system
+- **[Stage 9](STAGE9_IMPLEMENTATION.md)** - Export system
+- **[Stage 10](STAGE10_IMPLEMENTATION.md)** - Terminology neutralization
 
-- **[Engine README](Assets/Viable/Engine/README.md)** - Engine architecture details
+### Component Documentation
+- **[Engine README](Assets/Viable/Engine/README.md)** - Engine architecture
 - **[Contracts README](Assets/Viable/Contracts/README.md)** - DTO specifications
-- **[Test README](Assets/Viable/Engine.Tests/README.md)** - Test suite guide
-- **[Architecture Docs](ENGINE_EXTRACTION_PLAN.md)** - 7-phase refactor plan
+- **[Test Suite](Assets/Viable/Engine.Tests/README.md)** - Testing guide
 
-### Phase Documentation
-
-All 7 refactor phases documented:
-1. [Phase 1](ARCHITECTURE_PHASE1_COMPLETE.md) - Structure
-2. [Phase 2](ARCHITECTURE_PHASE2_COMPLETE.md) - State & Config
-3. [Phase 3](ARCHITECTURE_PHASE3_COMPLETE.md) - Step Phases
-4. [Phase 4](ARCHITECTURE_PHASE4_COMPLETE.md) - Logic Helpers
-5. [Phase 5](ARCHITECTURE_PHASE5_COMPLETE.md) - Engine Runner
-6. [Phase 6](ARCHITECTURE_PHASE6_COMPLETE.md) - Unity Layer
-7. [Phase 7](ARCHITECTURE_PHASE7_COMPLETE.md) - Cleanup
+### Archive
+- **[Research Archive](Assets/Viable/Core.Unity/Presets/Research_Archive/)** - Original presets with theory context preserved
 
 ---
 
 ## 🤝 Contributing
 
-This is a research project exploring vacuum negation theory. Contributions welcome!
-
-**Areas needing work:**
-- Additional test coverage (step phases, integration tests)
-- Performance profiling and optimization
-- 3D extension implementation
+Contributions welcome! Areas needing work:
+- Additional test coverage (target: 90%)
+- Performance optimization (SIMD, parallelization)
+- 3D grid extension
 - Visualization improvements
-- Documentation expansion
+- Additional neutral presets
 
 ---
 
 ## 📖 Citing This Work
 
-If you use Viable Engine in your research:
-
 ```bibtex
 @software{viable_engine_2024,
-  title={Viable Engine: A Deterministic Simulation Framework for Configuration Space Dynamics},
+  title={Viable Engine: A Deterministic Simulation Framework for Resource-Constrained Spatial Systems},
   author={Prosser, T. M.},
   year={2024},
   url={https://github.com/tiffy74/VacuumNegationSim},
-  note={Vacuum negation theoretical framework}
+  note={Deterministic engine for exploring persistence, propagation, and failure in coupled systems}
 }
 ```
 
@@ -415,7 +371,7 @@ If you use Viable Engine in your research:
 
 ## 📜 License
 
-MIT License. Use freely with attribution to the theoretical framework of *Energy as Vacuum Negation* by T. M. Prosser.
+MIT License. Use freely with attribution.
 
 See [LICENSE](LICENSE) for full terms.
 
@@ -423,23 +379,16 @@ See [LICENSE](LICENSE) for full terms.
 
 ## 🏆 Achievements
 
-- ✅ **7-phase architecture refactor** complete
+- ✅ **10-stage refactor** complete (Phases 1-7 + Stages 8-10)
 - ✅ **Unity-free deterministic engine** verified
 - ✅ **25 tests** covering 75% of critical components
 - ✅ **Determinism verified** with 100-step identical simulations
-- ✅ **Performance benchmarked** and meets targets
-- ✅ **Production-ready** for research use
+- ✅ **Export system** for reproducible research
+- ✅ **Preset system** for scenario management
+- ✅ **Neutral terminology** for broad applicability
 
-**Status:** 🚀 Ready for scientific research and publication!
-
----
-
-## 🔗 Links
-
-- **Repository:** https://github.com/tiffy74/VacuumNegationSim
-- **Issues:** https://github.com/tiffy74/VacuumNegationSim/issues
-- **Discussions:** https://github.com/tiffy74/VacuumNegationSim/discussions
+**Status:** 🚀 Ready for research, publication, and cross-domain applications!
 
 ---
 
-**Built with ❤️ for reproducible physics research**
+**Built for reproducible science across disciplines** ❤️

@@ -318,7 +318,7 @@ MonoBehaviour:
   Width: 128
   Height: 128
   CellPrefab: {fileID: 3393315673573950992, guid: cf7b32bdc04983848b884ca2783d3e8c, type: 3}
-  CellSize: 0.1
+  CellSize: 0.01
 --- !u!114 &2137104773
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -331,7 +331,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 548d06c545173e148b077bb25dcacc95, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  scenarioPreset: {fileID: 11400000, guid: e79e7bc672cc60f4eb71de1ce3c6756c, type: 2}
+  scenarioPreset: {fileID: 0}
   allowInspectorOverride: 0
   ResourceGlobalMax: 50000000
   ResourceGlobal: 10000000
@@ -370,7 +370,7 @@ MonoBehaviour:
   ScaleFactor: 1
   ticksPerSecond: 10
   renderMode: 0
-  Grid: {fileID: 2137104772}
+  Grid: {fileID: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
