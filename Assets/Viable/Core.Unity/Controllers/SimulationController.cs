@@ -598,5 +598,100 @@ namespace Viable.Core.Unity.Controllers
         {
             ExportLastRun();
         }
+
+        // ===== Stage 12: UI Support Methods =====
+
+        /// <summary>
+        /// Get current simulation tick for UI display.
+        /// </summary>
+        public int GetCurrentTick()
+        {
+            return context != null ? context.Tick : 0;
+        }
+
+        /// <summary>
+        /// Get current grid state for UI metrics.
+        /// </summary>
+        public GridState GetCurrentState()
+        {
+            return state;
+        }
+
+        /// <summary>
+        /// Get current step context for UI access.
+        /// </summary>
+        public StepContext GetCurrentContext()
+        {
+            return context;
+        }
+
+        /// <summary>
+        /// Get current summary metrics for UI display.
+        /// </summary>
+        public System.Collections.Generic.Dictionary<string, double> GetCurrentMetrics()
+        {
+            return ComputeCurrentMetrics();
+        }
+
+        /// <summary>
+        /// Load a preset at runtime and restart simulation.
+        /// Stage 12: Enables UI preset switching.
+        /// </summary>
+        public void LoadPreset(ScenarioPreset preset)
+        {
+            if (preset == null)
+            {
+                Debug.LogWarning("[SimulationController] Cannot load null preset");
+                return;
+            }
+
+            scenarioPreset = preset;
+            Debug.Log($"[SimulationController] Loading preset: {preset.PresetName}");
+
+            // Pause current simulation
+            Pause();
+
+            // Stop existing coroutine if running
+            StopAllCoroutines();
+
+            // Reinitialize with new preset
+            InitializeSimulation();
+
+            Debug.Log($"[SimulationController] Preset loaded: {preset.PresetName}");
+        }
+
+        /// <summary>
+        /// Export and return the export path for UI feedback.
+        /// Stage 12: Enables UI to show export location.
+        /// </summary>
+        public string ExportLastRunWithPath()
+        {
+            return ExportLastRunWithPath(RunExportOptions.ForLevel(ExportLevel.Publication));
+        }
+
+        /// <summary>
+        /// Export with options and return path.
+        /// </summary>
+        public string ExportLastRunWithPath(RunExportOptions options)
+        {
+            if (lastScenario == null || lastResult == null)
+            {
+                Debug.LogWarning("[SimulationController] No run to export");
+                return null;
+            }
+
+            try
+            {
+                var exporter = new RunExporter();
+                string exportPath = exporter.Export(lastScenario, lastRequest, lastResult, options);
+                Debug.Log($"[SimulationController] ? Export complete: {exportPath}");
+                return exportPath;
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[SimulationController] ? Export failed: {ex.Message}");
+                return null;
+            }
+        }
     }
 }
