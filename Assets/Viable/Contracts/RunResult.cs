@@ -8,6 +8,12 @@ namespace Viable.Contracts
     public sealed class RunResult
     {
         /// <summary>
+        /// Unique identifier for this run (GUID).
+        /// Stage 9: Added for export system.
+        /// </summary>
+        public string RunId { get; set; } = System.Guid.NewGuid().ToString();
+
+        /// <summary>
         /// Engine metadata for version tracking.
         /// </summary>
         public EngineMetadata Metadata { get; set; } = EngineMetadata.Current();

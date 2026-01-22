@@ -6,6 +6,7 @@ using Viable.Engine.Execution;
 using Viable.Engine.Configuration;
 using Viable.Contracts;
 using Viable.Core.Unity.Visuals;
+using Viable.Core.Unity.Export; // ADDED: For export system
 
 namespace Viable.Core.Unity.Controllers
 {
@@ -13,6 +14,7 @@ namespace Viable.Core.Unity.Controllers
     /// Unity controller for running Viable Engine simulations.
     /// Can run from a ScenarioPreset (productized) or manual Inspector settings (legacy).
     /// Stage 8: Refactored to support preset system while preserving current behavior.
+    /// Stage 9: Added export functionality for reproducible research.
     /// </summary>
     public class SimulationController : MonoBehaviour
     {
@@ -33,6 +35,7 @@ namespace Viable.Core.Unity.Controllers
         // Store last run for export (Stage 9)
         private ScenarioDefinition lastScenario;
         private RunRequest lastRequest;
+        private RunResult lastResult; // ADDED: Store run result
 
         // ===== Legacy Inspector Settings (kept for backward compatibility) =====
         [Header("Legacy Settings (used if no preset loaded)")]
@@ -135,6 +138,17 @@ namespace Viable.Core.Unity.Controllers
                 // Update Grid size (if dynamic)
                 Grid.Width = gridWidth;
                 Grid.Height = gridHeight;
+
+                // Store scenario for export (Stage 9)
+                lastScenario = ScenarioPresetAdapter.ToScenarioDefinition(scenarioPreset);
+                
+                // Create default run request for export
+                lastRequest = new RunRequest
+                {
+                    Steps = 0, // Will be updated as simulation runs
+                    SampleEvery = 10,
+                    EmitEvents = false
+                };
             }
             else
             {
@@ -146,6 +160,26 @@ namespace Viable.Core.Unity.Controllers
                 
                 // Build configuration from Inspector
                 config = BuildLegacyConfig();
+
+                // Create minimal scenario definition for legacy mode
+                lastScenario = new ScenarioDefinition
+                {
+                    ScenarioId = "legacy-inspector-run",
+                    ScenarioName = "Legacy Inspector Configuration",
+                    Description = "Run using Inspector parameter values",
+                    GridWidth = gridWidth,
+                    GridHeight = gridHeight,
+                    Seed = null,
+                    Parameters = new System.Collections.Generic.Dictionary<string, double>()
+                };
+
+                // Create default run request
+                lastRequest = new RunRequest
+                {
+                    Steps = 0,
+                    SampleEvery = 10,
+                    EmitEvents = false
+                };
             }
 
             // Spawn visual cells
@@ -179,12 +213,6 @@ namespace Viable.Core.Unity.Controllers
                 inactiveColor, dormantColor, showComplexity
             );
             gridRenderer.ViabilityColorScale = 40f;
-
-            // Store scenario for export (Stage 9)
-            if (scenarioPreset != null)
-            {
-                lastScenario = ScenarioPresetAdapter.ToScenarioDefinition(scenarioPreset);
-            }
 
             StartCoroutine(SimLoop());
         }
@@ -323,6 +351,9 @@ namespace Viable.Core.Unity.Controllers
             // Step simulation
             runner.Step(context);
 
+            // Update lastResult after each step (for export)
+            UpdateLastResult();
+
             // Optional diagnostics
             if (context.Tick % 20 == 0)
             {
@@ -331,6 +362,72 @@ namespace Viable.Core.Unity.Controllers
 
             LogTickSummary();
             UpdateVisualsFromState();
+        }
+
+        /// <summary>
+        /// Update lastResult with current simulation state.
+        /// Called after each step to keep export data fresh.
+        /// </summary>
+        private void UpdateLastResult()
+        {
+            if (lastResult == null)
+            {
+                lastResult = new RunResult
+                {
+                    RunId = System.Guid.NewGuid().ToString(),
+                    ScenarioId = lastScenario?.ScenarioId ?? "unknown",
+                    Metadata = Contracts.EngineMetadata.Current(),
+                    Samples = new System.Collections.Generic.List<StateSample>()
+                };
+            }
+
+            lastResult.StepsExecuted = context.Tick;
+            lastResult.FinalTime = context.Tick * context.DeltaTime;
+            lastResult.FinalState = state; // Could be expensive - only set if needed
+            lastResult.SummaryMetrics = ComputeCurrentMetrics();
+
+            // Collect samples every 10 ticks for export
+            if (context.Tick % 10 == 0)
+            {
+                var sample = new StateSample
+                {
+                    StepIndex = context.Tick,
+                    Time = context.Tick * context.DeltaTime,
+                    Metrics = ComputeCurrentMetrics()
+                };
+                lastResult.Samples.Add(sample);
+            }
+        }
+
+        /// <summary>
+        /// Compute current metrics for export.
+        /// </summary>
+        private System.Collections.Generic.Dictionary<string, double> ComputeCurrentMetrics()
+        {
+            int viableCount = 0;
+            int activeCount = 0;
+            int sinkCount = 0;
+            double totalResource = 0;
+            double totalComplexity = 0;
+
+            for (int i = 0; i < state.Len; i++)
+            {
+                if (state.V[i] > 0f) viableCount++;
+                if (state.Active[i] == 1) activeCount++;
+                if (state.IsSink[i]) sinkCount++;
+                totalResource += state.ResourceLocal[i];
+                totalComplexity += state.ComplexityMetric[i];
+            }
+
+            return new System.Collections.Generic.Dictionary<string, double>
+            {
+                ["viableCount"] = viableCount,
+                ["activeCount"] = activeCount,
+                ["sinkCount"] = sinkCount,
+                ["avgResource"] = totalResource / state.Len,
+                ["avgComplexity"] = totalComplexity / state.Len,
+                ["resourceGlobal"] = context.ResourceGlobal
+            };
         }
 
         private void UpdateVisualsFromState()
@@ -446,9 +543,60 @@ namespace Viable.Core.Unity.Controllers
         }
 
         // ===== Stage 9 Preparation: Export Access =====
+
+        /// <summary>
+        /// Export the last simulation run to disk.
+        /// Creates a timestamped export directory with manifest, CSVs, and checksums.
+        /// </summary>
+        public void ExportLastRun()
+        {
+            ExportLastRun(RunExportOptions.ForLevel(ExportLevel.Publication));
+        }
+
+        /// <summary>
+        /// Export the last simulation run with custom options.
+        /// </summary>
+        public void ExportLastRun(RunExportOptions options)
+        {
+            if (lastScenario == null)
+            {
+                Debug.LogWarning("[SimulationController] No scenario to export! Run a simulation first.");
+                return;
+            }
+
+            if (lastResult == null)
+            {
+                Debug.LogWarning("[SimulationController] No result to export! Run a simulation first.");
+                return;
+            }
+
+            try
+            {
+                var exporter = new RunExporter();
+                string exportPath = exporter.Export(lastScenario, lastRequest, lastResult, options);
+                
+                Debug.Log($"[SimulationController] ? Export complete: {exportPath}");
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[SimulationController] ? Export failed: {ex.Message}\n{ex.StackTrace}");
+            }
+        }
+
         /// <summary>
         /// Get last scenario for export (Stage 9).
         /// </summary>
         public ScenarioDefinition GetLastScenario() => lastScenario;
+
+        /// <summary>
+        /// Get last run result for export (Stage 9).
+        /// </summary>
+        public RunResult GetLastResult() => lastResult;
+
+        [ContextMenu("Export Current Run")]
+        public void ExportCurrentRun()
+        {
+            ExportLastRun();
+        }
     }
 }
