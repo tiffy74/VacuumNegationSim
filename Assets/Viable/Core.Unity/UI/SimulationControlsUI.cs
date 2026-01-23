@@ -77,12 +77,9 @@ namespace Viable.Core.Unity.UI
             if (simulationController == null) return;
 
             // Update tick display
-            // Note: Requires adding GetCurrentTick() to SimulationController
-            // For now, show placeholder
             if (tickText != null)
             {
-                // TODO: Get actual tick from SimulationController
-                tickText.text = $"Tick: [N/A]";
+                tickText.text = $"Tick: {simulationController.GetCurrentTick()}";
             }
         }
 

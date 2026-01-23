@@ -1,0 +1,49 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8662d90e0f66f154a872e45fd4e506e8, type: 3}
+  m_Name: 04_CompetingRegions
+  m_EditorClassIdentifier: 
+  PresetId: rapid-expansion
+  PresetName: Rapid Expansion
+  Description: "Fast propagation with abundant resources. Demonstrates growth-dominated
+    regime where expansion overwhelms decay. Shows spatial spread dynamics and coverage
+    patterns.\r"
+  GridWidth: 128
+  GridHeight: 128
+  InitialResourceGlobal: 10000000
+  ScaleFactor: 1
+  DeltaTime: 1
+  Parameters:
+  - Key: decayLoss
+    Value: 0.001
+  - Key: resourceGlobalMax
+    Value: 1000000000
+  - Key: globalReplenishPerTick
+    Value: 500
+  - Key: ethreshBase
+    Value: 0.18
+  - Key: globalScarcityK
+    Value: 0.3
+  - Key: propagateFrac
+    Value: 0.35
+  - Key: regionExpansionChance
+    Value: 0.5
+  - Key: complexityDiffusionRate
+    Value: 0.2
+  - Key: complexityDecay
+    Value: 0.02
+  - Key: perturbationProbability
+    Value: 0.0002
+  InactiveColor: {r: 0.019607844, g: 0.019607844, b: 0.03137255, a: 1}
+  DormantRegionColor: {r: 0.05882353, g: 0, b: 0.09803922, a: 1}
+  ShowComplexityTint: 0
+  TicksPerSecond: 10

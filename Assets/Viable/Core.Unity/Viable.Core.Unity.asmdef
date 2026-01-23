@@ -3,7 +3,8 @@
     "rootNamespace": "Viable.Core.Unity",
     "references": [
         "Viable.Contracts",
-        "Viable.Engine"
+        "Viable.Engine",
+        "Unity.TextMeshPro"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

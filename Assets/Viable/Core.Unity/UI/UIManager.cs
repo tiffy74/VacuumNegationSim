@@ -48,27 +48,64 @@ namespace Viable.Core.Unity.UI
                     Debug.LogError("[UIManager] SimulationController not found!");
                     return;
                 }
+                else
+                {
+                    Debug.Log("[UIManager] SimulationController found automatically");
+                }
             }
 
             // Initialize panels
             if (presetSelector != null)
+            {
                 presetSelector.Initialize(simulationController);
+                Debug.Log("[UIManager] PresetSelector initialized");
+            }
+            else
+            {
+                Debug.LogWarning("[UIManager] PresetSelector is null!");
+            }
 
             if (simulationControls != null)
+            {
                 simulationControls.Initialize(simulationController);
+                Debug.Log("[UIManager] SimulationControls initialized");
+            }
+            else
+            {
+                Debug.LogWarning("[UIManager] SimulationControls is null!");
+            }
 
             if (infoDisplay != null)
+            {
                 infoDisplay.Initialize(simulationController);
+                Debug.Log("[UIManager] InfoDisplay initialized");
+            }
+            else
+            {
+                Debug.LogWarning("[UIManager] InfoDisplay is null!");
+            }
 
             if (exportUI != null)
+            {
                 exportUI.Initialize(simulationController);
+                Debug.Log("[UIManager] ExportUI initialized");
+            }
+            else
+            {
+                Debug.LogWarning("[UIManager] ExportUI is null!");
+            }
 
             if (parameterEditor != null && showParameterEditor)
+            {
                 parameterEditor.Initialize(simulationController);
+                Debug.Log("[UIManager] ParameterEditor initialized");
+            }
             else if (parameterEditor != null)
+            {
                 parameterEditor.gameObject.SetActive(false);
+            }
 
-            Debug.Log("[UIManager] UI initialized successfully");
+            Debug.Log("[UIManager] UI initialization complete");
         }
 
         /// <summary>

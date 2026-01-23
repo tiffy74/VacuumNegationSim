@@ -86,15 +86,24 @@ The framework is designed for domains where:
 - Parameter versioning
 
 ### **Fully Tested**
-- 25 tests covering 75% of critical components
+- 35 tests covering 75% of critical components
 - Determinism verified (100-step identical runs)
 - Performance benchmarks included
+- UI integration tests (preset loading)
+
+### **Essential UI System (Stage 12)**
+- Point-and-click interface for non-programmers
+- Preset selector with dropdown
+- Play/Pause/Stop controls with speed adjustment
+- Real-time metrics display (tick, viable cells, sinks, resources)
+- Visible export button with feedback
+- Runtime preset switching
 
 ---
 
 ## 📊 Architecture Overview
 
-### Current Status: **10 Stages Complete**
+### Current Status: **11 Stages Complete**
 
 | Stage | Status | What It Achieved |
 |-------|--------|------------------|
@@ -104,6 +113,7 @@ The framework is designed for domains where:
 | **Stage 8** | ✅ Complete | Core.Unity productization with preset system |
 | **Stage 9** | ✅ Complete | Export system for reproducible research |
 | **Stage 10** | ✅ Complete | Terminology neutralization for broad applicability |
+| **Stage 12** | ✅ Complete | Essential UI system for non-programmers |
 
 ### Assembly Structure
 
@@ -126,6 +136,7 @@ Viable.Core.Unity (Visualization & UI)
     ├─ Controllers/      → SimulationController, SimulationGrid
     ├─ Rendering/        → GridRenderer (state → visual)
     ├─ Visuals/          → CameraController, CellVisualiser
+    ├─ UI/               → UIManager, PresetSelector, Controls, InfoDisplay, Export
     ├─ Presets/          → ScenarioPreset assets
     └─ Export/           → RunExporter, CSV/JSON writers
 ```
@@ -333,6 +344,7 @@ Push parameters into extreme regimes:
 - **[Stage 8](STAGE8_IMPLEMENTATION.md)** - Core.Unity preset system
 - **[Stage 9](STAGE9_IMPLEMENTATION.md)** - Export system
 - **[Stage 10](STAGE10_IMPLEMENTATION.md)** - Terminology neutralization
+- **[Stage 12](STAGE12_COMPLETE.md)** - Essential UI system
 
 ### Component Documentation
 - **[Engine README](Assets/Viable/Engine/README.md)** - Engine architecture
@@ -379,13 +391,14 @@ See [LICENSE](LICENSE) for full terms.
 
 ## 🏆 Achievements
 
-- ✅ **10-stage refactor** complete (Phases 1-7 + Stages 8-10)
+- ✅ **11-stage refactor** complete (Phases 1-7 + Stages 8-10 + Stage 12)
 - ✅ **Unity-free deterministic engine** verified
-- ✅ **25 tests** covering 75% of critical components
+- ✅ **35 tests** covering 75% of critical components (25 Engine + 10 UI)
 - ✅ **Determinism verified** with 100-step identical simulations
 - ✅ **Export system** for reproducible research
 - ✅ **Preset system** for scenario management
 - ✅ **Neutral terminology** for broad applicability
+- ✅ **Essential UI system** for non-programmer users
 
 **Status:** 🚀 Ready for research, publication, and cross-domain applications!
 

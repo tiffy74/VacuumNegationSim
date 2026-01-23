@@ -1,5 +1,5 @@
-using UnityEngine;
 using TMPro;
+using UnityEngine;
 
 namespace Viable.Core.Unity.UI
 {
@@ -18,7 +18,7 @@ namespace Viable.Core.Unity.UI
         [SerializeField] private TextMeshProUGUI resourceGlobalText;
 
         [Header("Settings")]
-        [SerializeField] private int updateFrequency = 10; // Update every N frames
+        [SerializeField] private int updateFrequency = 1; // Update every frame for now
 
         private Controllers.SimulationController simulationController;
         private int frameCounter = 0;
@@ -26,11 +26,16 @@ namespace Viable.Core.Unity.UI
         public void Initialize(Controllers.SimulationController controller)
         {
             simulationController = controller;
+            Debug.Log("[InfoDisplayUI] Initialized with SimulationController");
         }
 
         public void UpdateDisplay()
         {
-            if (simulationController == null) return;
+            if (simulationController == null)
+            {
+                Debug.LogWarning("[InfoDisplayUI] SimulationController is null!");
+                return;
+            }
 
             // Update every N frames to reduce overhead
             frameCounter++;
@@ -38,49 +43,47 @@ namespace Viable.Core.Unity.UI
             frameCounter = 0;
 
             // Get metrics from SimulationController
-            // Note: This requires adding public getters to SimulationController
             UpdateMetrics();
         }
 
         private void UpdateMetrics()
         {
-            // TODO: Get actual metrics from SimulationController
-            // For now, show placeholders
-
-            if (tickText != null)
+            try
             {
-                tickText.text = $"Tick: [N/A]";
-                // TODO: tickText.text = $"Tick: {simulationController.GetCurrentTick()}";
-            }
+                // Get current metrics from SimulationController
+                var metrics = simulationController.GetCurrentMetrics();
+                var context = simulationController.GetCurrentContext();
 
-            if (viableCountText != null)
+                if (tickText != null)
+                {
+                    int tick = simulationController.GetCurrentTick();
+                    tickText.text = $"Tick: {tick}";
+                }
+
+                if (viableCountText != null && metrics != null && metrics.ContainsKey("viableCount"))
+                {
+                    viableCountText.text = $"Viable: {metrics["viableCount"]:F0}";
+                }
+
+                if (activeCountText != null && metrics != null && metrics.ContainsKey("activeCount"))
+                {
+                    activeCountText.text = $"Active: {metrics["activeCount"]:F0}";
+                }
+
+                if (sinkCountText != null && metrics != null && metrics.ContainsKey("sinkCount"))
+                {
+                    sinkCountText.text = $"Sinks: {metrics["sinkCount"]:F0}";
+                }
+
+                if (resourceGlobalText != null && context != null)
+                {
+                    resourceGlobalText.text = $"Resource: {context.ResourceGlobal:F0}";
+                }
+            }
+            catch (System.Exception ex)
             {
-                viableCountText.text = $"Viable: [N/A]";
-                // TODO: Get from result.SummaryMetrics["viableCount"]
+                Debug.LogError($"[InfoDisplayUI] Error updating metrics: {ex.Message}");
             }
-
-            if (activeCountText != null)
-            {
-                activeCountText.text = $"Active: [N/A]";
-                // TODO: Get from result.SummaryMetrics["activeCount"]
-            }
-
-            if (sinkCountText != null)
-            {
-                sinkCountText.text = $"Sinks: [N/A]";
-                // TODO: Get from result.SummaryMetrics["sinkCount"]
-            }
-
-            if (resourceGlobalText != null)
-            {
-                resourceGlobalText.text = $"Resource: [N/A]";
-                // TODO: Get from context.ResourceGlobal
-            }
-
-            // Note: SimulationController needs to expose:
-            // public int GetCurrentTick() => context.Tick;
-            // public GridState GetCurrentState() => state;
-            // public StepContext GetCurrentContext() => context;
         }
     }
 }
