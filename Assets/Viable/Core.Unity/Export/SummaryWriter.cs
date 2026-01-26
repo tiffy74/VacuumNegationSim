@@ -73,6 +73,23 @@ namespace Viable.Core.Unity.Export
                 sb.AppendLine($"**Samples Collected:** {result.Samples.Count}");
                 sb.AppendLine($"**Sample Interval:** Every {request?.SampleEvery ?? 1} steps");
                 sb.AppendLine();
+                
+                // Stage 13.2: Value semantics legend
+                if (result.ValueSemantics != null && result.ValueSemantics.Count > 0)
+                {
+                    sb.AppendLine("### Value Semantics");
+                    sb.AppendLine();
+                    sb.AppendLine("Metric suffixes in `metrics.csv` indicate value types:");
+                    sb.AppendLine();
+                    sb.AppendLine("- `_Q` = Quantity (abstract resource units)");
+                    sb.AppendLine("- `_Q_per_step` = Rate or Cost (quantity per simulation step)");
+                    sb.AppendLine("- `_index` = Index (dimensionless, normalized metric)");
+                    sb.AppendLine("- `_count` = Count (integer quantity)");
+                    sb.AppendLine();
+                    sb.AppendLine("**Note:** Q is an abstract quantity unit without physical dimensions.");
+                    sb.AppendLine("Time basis is per simulation step (not physical time).");
+                    sb.AppendLine();
+                }
             }
 
             // Events

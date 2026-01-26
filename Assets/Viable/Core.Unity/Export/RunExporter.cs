@@ -61,7 +61,7 @@ namespace Viable.Core.Unity.Export
                 if (result.Samples != null && result.Samples.Count > 0)
                 {
                     string metricsPath = Path.Combine(exportPath, "metrics.csv");
-                    metricsWriter.Write(metricsPath, result.Samples);
+                    metricsWriter.Write(metricsPath, result.Samples, result.ValueSemantics);
                 }
 
                 // Write events CSV

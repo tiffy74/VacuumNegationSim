@@ -78,6 +78,9 @@ namespace Viable.Engine
                 Metadata = EngineMetadata.Current()
             };
 
+            // Stage 13.2: Populate value semantics for interpretable outputs
+            PopulateValueSemantics(result);
+
             // Execute simulation
             int stepsToExecute = request.Steps;
             int sampleInterval = Math.Max(1, request.SampleEvery);
@@ -107,7 +110,29 @@ namespace Viable.Engine
         }
 
         /// <summary>
+        /// Populate value semantics dictionary describing metric meanings.
+        /// Stage 13.2: Enables interpretable outputs without physical units.
+        /// </summary>
+        private void PopulateValueSemantics(RunResult result)
+        {
+            result.ValueSemantics["viableCount"] = "Count";
+            result.ValueSemantics["activeCount"] = "Count";
+            result.ValueSemantics["sinkCount"] = "Count";
+            result.ValueSemantics["avgResource"] = "Quantity (Q)";
+            result.ValueSemantics["avgComplexity"] = "Index (dimensionless)";
+            result.ValueSemantics["resourceGlobal"] = "Quantity (Q)";
+            
+            // Add semantics for common scenario parameters that might appear in metrics
+            result.ValueSemantics["decayLoss"] = "Rate (Q/step)";
+            result.ValueSemantics["maintenanceCost"] = "Cost (Q/step)";
+            result.ValueSemantics["inflow"] = "Rate (Q/step)";
+            result.ValueSemantics["outflow"] = "Rate (Q/step)";
+            result.ValueSemantics["viability"] = "Index (dimensionless)";
+        }
+
+        /// <summary>
         /// Build SimulationConfiguration from ScenarioDefinition parameters.
+        /// Stage 13: Safely reads EngineConfig with defaults preserving current behavior.
         /// </summary>
         private Configuration.SimulationConfiguration BuildConfigurationFromScenario(ScenarioDefinition scenario)
         {
@@ -120,6 +145,21 @@ namespace Viable.Engine
             if (scenario.Parameters.TryGetValue("decayLoss", out double dl))
                 config.DecayLoss = (float)dl;
             // TODO: Map remaining parameters
+
+            // Stage 13: Read EngineConfig if present, otherwise use defaults
+            // Defaults preserve current behavior exactly
+            var engineConfig = scenario.EngineConfig ?? new EngineConfig();
+            
+            // Store mechanism selectors in config (no behavior change yet)
+            // These will be read by PhaseFactory in future stages
+            config.InflowMode = engineConfig.InflowMode;
+            config.OutflowMode = engineConfig.OutflowMode;
+            config.DiffusionMode = engineConfig.DiffusionMode;
+            config.BoundaryMode = engineConfig.BoundaryMode;
+            config.ViabilityRule = engineConfig.ViabilityRule;
+            config.TopologyMode = engineConfig.TopologyMode;
+            config.MaskShape = engineConfig.MaskShape;
+            config.RefinementMode = engineConfig.RefinementMode;
 
             return config;
         }

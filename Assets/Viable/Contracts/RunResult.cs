@@ -54,6 +54,14 @@ namespace Viable.Contracts
         public Dictionary<string, double> SummaryMetrics { get; set; } = new Dictionary<string, double>();
 
         /// <summary>
+        /// Value semantics describing the meaning of metric keys.
+        /// Stage 13.2: Enables interpretable outputs without physical units.
+        /// Format: metric_name -> semantic_type
+        /// Semantic types: "Quantity (Q)", "Rate (Q/step)", "Cost (Q/step)", "Index (dimensionless)", "Count"
+        /// </summary>
+        public Dictionary<string, string> ValueSemantics { get; set; } = new Dictionary<string, string>();
+
+        /// <summary>
         /// Optional stop reason if execution terminated early.
         /// </summary>
         public string StopReason { get; set; }

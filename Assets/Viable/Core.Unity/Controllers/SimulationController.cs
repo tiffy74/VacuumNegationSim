@@ -4,6 +4,7 @@ using Viable.Engine;
 using Viable.Engine.State;
 using Viable.Engine.Execution;
 using Viable.Engine.Configuration;
+using Viable.Engine.Interfaces; // ADDED: For IStepPhase
 using Viable.Contracts;
 using Viable.Core.Unity.Visuals;
 using Viable.Core.Unity.Export; // ADDED: For export system
@@ -199,9 +200,14 @@ namespace Viable.Core.Unity.Controllers
             // Initialize state
             InitStateInto(state, context);
 
-            // Create Engine runner
-            var stepper = new SimulationStepper(CountPersistenceConfigurations);
-            runner = new SimulationRunner(state, new[] { stepper });
+            // Stage 13.3: Create phases using phase set configuration
+            // For now, always use default pipeline (SimulationStepper)
+            // Future stages will use PhaseFactory when assembly issues resolved
+            string phaseSetId = lastScenario.EngineConfig?.PhaseSetId ?? "default";
+            var phases = BuildPhasePipeline(phaseSetId);
+
+            // Create Engine runner with configured phases
+            runner = new SimulationRunner(state, phases);
 
             // Setup renderer
             Color inactiveColor = scenarioPreset != null ? scenarioPreset.InactiveColor : InactiveColor;
@@ -280,6 +286,33 @@ namespace Viable.Core.Unity.Controllers
             config.EthreshBase = EthreshBase;
             config.GlobalScarcityK = GlobalScarcityK;
             // Add more overrides as needed for tuning
+        }
+
+        /// <summary>
+        /// Build simulation phase pipeline based on PhaseSetId.
+        /// Stage 13.3: For now, always returns default pipeline.
+        /// Stage 13.4: Supports InflowMode selection within default pipeline.
+        /// Future: Will use PhaseFactory when assembly issues resolved.
+        /// </summary>
+        private System.Collections.Generic.List<IStepPhase> BuildPhasePipeline(string phaseSetId)
+        {
+            // Stage 13.4: Check InflowMode to determine pipeline configuration
+            var engineConfig = lastScenario.EngineConfig ?? new EngineConfig();
+            
+            var phases = new System.Collections.Generic.List<IStepPhase>();
+
+            if (engineConfig.InflowMode == Contracts.InflowMode.PointSources)
+            {
+                // Point sources mode: Use SimulationStepper with point sources
+                phases.Add(new SimulationStepper(CountPersistenceConfigurations, engineConfig.PointSources));
+            }
+            else
+            {
+                // Default: Uniform inflow (current behavior)
+                phases.Add(new SimulationStepper(CountPersistenceConfigurations));
+            }
+
+            return phases;
         }
 
         IEnumerator SimLoop()

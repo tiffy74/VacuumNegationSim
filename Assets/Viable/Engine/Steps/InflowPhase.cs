@@ -8,8 +8,57 @@ namespace Viable.Engine.Steps
     public static class InflowPhase
     {
         /// <summary>
+        /// Apply point source inflow - inject resources at specified locations.
+        /// Stage 13.4: Creates visibly different dynamics with localized sources.
+        /// </summary>
+        public static void ApplyPointSources(
+            int width, int height,
+            Func<int, int, int> Idx,
+            float[] ResourceLocal,
+            byte[] Active,
+            bool[] ActiveRegion,
+            int[] RegionActivationTick,
+            int[] ResourceFirstTick,
+            System.Collections.Generic.List<Contracts.PointSourceConfig> pointSources,
+            float ResourceLocalMax,
+            int tick)
+        {
+            if (pointSources == null || pointSources.Count == 0)
+                return;
+
+            // Stage 13.4: Inject resources at each point source location
+            // Process sources in list order for determinism
+            foreach (var source in pointSources)
+            {
+                // Validate coordinates are within grid bounds
+                if (source.X < 0 || source.X >= width || source.Y < 0 || source.Y >= height)
+                    continue; // Skip out-of-bounds sources
+
+                int idx = Idx(source.X, source.Y);
+
+                // Inject strength directly into resource pool
+                // Respect ResourceLocalMax limit
+                float currentResource = ResourceLocal[idx];
+                float inflowAmount = (float)source.Strength;
+
+                // Apply inflow with clamping to max
+                ResourceLocal[idx] = Math.Min(currentResource + inflowAmount, ResourceLocalMax);
+
+                // Mark cell as active if not already (point sources create activity)
+                if (Active[idx] == 0)
+                {
+                    Active[idx] = 1;
+                    ActiveRegion[idx] = true;
+                    RegionActivationTick[idx] = tick;
+                    ResourceFirstTick[idx] = tick;
+                }
+            }
+        }
+
+        /// <summary>
         /// Apply incoming resource flow, update complexity/viability/active flags, and enforce hard constraints.
         /// Uses RNG from StepContext for deterministic perturbations.
+        /// Stage 13.7: Supports hysteresis activation rule.
         /// </summary>
         public static void ApplyAndViability(
             Func<int, int, int> Idx,
@@ -26,7 +75,10 @@ namespace Viable.Engine.Steps
             bool[] ActiveRegion, bool[] IsSink,
             int[] RegionActivationTick, int[] ResourceFirstTick,
             int tick,
-            Random rng)
+            Random rng,
+            Contracts.ViabilityRule viabilityRule = Contracts.ViabilityRule.HardThreshold,  // Stage 13.7
+            double hysteresisOnThreshold = 0.0,  // Stage 13.7
+            double hysteresisOffThreshold = 0.0)  // Stage 13.7
         {
             // Neighbour offsets (4-way)
             int[] dx = { 0, 0, -1, 1 };
@@ -146,10 +198,16 @@ namespace Viable.Engine.Steps
                     V[i] = ComputeViability(inFlow * constraintBoost, ResourceLocal[i], ComplexityMetric[i]);
                     
                     // ---- ACTIVE STATE ----
-                    if (V[i] > 0f && ResourceLocal[i] > MinBudgetToPropagate)
-                        Active[i] = 1;
-                    else
-                        Active[i] = 0;
+                    // Stage 13.7: Use ViabilityCalculator to determine activation with hysteresis support
+                    Active[i] = Computation.ViabilityCalculator.DetermineActiveState(
+                        V[i],
+                        Active[i],
+                        ResourceLocal[i],
+                        MinBudgetToPropagate,
+                        viabilityRule,
+                        hysteresisOnThreshold,
+                        hysteresisOffThreshold
+                    );
 
                     // ---- BASELINE DECAY ----
                     if (DecayLoss > 0f)

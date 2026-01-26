@@ -45,6 +45,14 @@ namespace Viable.Engine.State
         // ---- Optional helper field for diagnostics/forces ----
         public float[] SinkPotential;
 
+        // ---- Domain mask (Stage 13.8) ----
+        /// <summary>
+        /// Optional domain mask for constrained propagation.
+        /// Stage 13.8: true = cell is valid (inside mask), false = cell is masked out.
+        /// null = no mask (all cells valid, default behavior).
+        /// </summary>
+        public bool[] DomainMask;
+
         // ---- Other book-keeping ----
         public int[] ZeroResourceTicks;
 
@@ -87,6 +95,18 @@ namespace Viable.Engine.State
             SinkMass = new float[initialSinkCapacity];
 
             Reset();
+        }
+
+        /// <summary>
+        /// Set the domain mask for constrained propagation.
+        /// Stage 13.8: Mask generation based on MaskShape and parameters.
+        /// </summary>
+        public void SetDomainMask(bool[] mask)
+        {
+            if (mask != null && mask.Length != Len)
+                throw new ArgumentException($"Mask length {mask.Length} does not match grid size {Len}");
+            
+            DomainMask = mask;
         }
 
         /// <summary>

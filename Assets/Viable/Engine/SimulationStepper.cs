@@ -13,14 +13,30 @@ namespace Viable.Engine
     /// <summary>
     /// Standard simulation stepper that orchestrates all step phases.
     /// This is the Engine equivalent of LegacyTickStep.
+    /// Stage 13.4: Supports optional point sources for localized inflow.
     /// </summary>
     public sealed class SimulationStepper : IStepPhase
     {
         private readonly Func<int, int> _countPersistenceConfigurations;
+        private readonly List<PointSourceConfig> _pointSources;
+        private readonly bool _usePointSources;
 
         public SimulationStepper(Func<int, int> countPersistenceConfigurations)
         {
             _countPersistenceConfigurations = countPersistenceConfigurations ?? throw new ArgumentNullException(nameof(countPersistenceConfigurations));
+            _pointSources = null;
+            _usePointSources = false;
+        }
+
+        /// <summary>
+        /// Constructor with optional point sources support.
+        /// Stage 13.4: When point sources provided, uses localized inflow instead of central pulse.
+        /// </summary>
+        public SimulationStepper(Func<int, int> countPersistenceConfigurations, List<PointSourceConfig> pointSources)
+        {
+            _countPersistenceConfigurations = countPersistenceConfigurations ?? throw new ArgumentNullException(nameof(countPersistenceConfigurations));
+            _pointSources = pointSources;
+            _usePointSources = pointSources != null && pointSources.Count > 0;
         }
 
         public void Execute(GridState state, StepContext context)
@@ -29,6 +45,23 @@ namespace Viable.Engine
             if (context == null) throw new ArgumentNullException(nameof(context));
 
             var cfg = context.Config;
+
+            // Stage 13.8: Generate and set domain mask if needed
+            if (state.DomainMask == null && cfg.MaskShape != Contracts.MaskShape.Rectangle)
+            {
+                // Generate mask on first execution
+                // For deterministic percolation holes, we use a fixed seed (could be enhanced later)
+                int maskSeed = 12345;  // Fixed seed for now - could be passed via config later
+                state.SetDomainMask(MaskGenerator.GenerateMask(
+                    state.W, state.H,
+                    cfg.MaskShape,
+                    cfg.MaskRadius,
+                    cfg.MaskInnerRadius,
+                    cfg.CorridorWidth,
+                    cfg.HoleProbability,
+                    maskSeed
+                ));
+            }
 
             // -----------------------------
             // A) Region expansion first
@@ -73,19 +106,39 @@ namespace Viable.Engine
             );
 
             // -----------------------------
-            // C) Pass1: Central inflow (seed pulse)
+            // C) Pass1: Central inflow (seed pulse) OR Point Sources
             // -----------------------------
-            OutflowPhase.GatherInflow(
-                state.W, state.H,
-                (x, y) => state.Idx(x, y),
-                state.ResourceLocal,
-                state.RegionActivationTick,
-                state.ResourceFirstTick,
-                state.ActiveRegion,
-                state.Active,
-                state.Incoming,
-                context.Tick
-            );
+            if (_usePointSources)
+            {
+                // Stage 13.4: Point source inflow (localized injection)
+                InflowPhase.ApplyPointSources(
+                    state.W, state.H,
+                    (x, y) => state.Idx(x, y),
+                    state.ResourceLocal,
+                    state.Active,
+                    state.ActiveRegion,
+                    state.RegionActivationTick,
+                    state.ResourceFirstTick,
+                    _pointSources,
+                    cfg.ResourceLocalMax,
+                    context.Tick
+                );
+            }
+            else
+            {
+                // Default: Central inflow (seed pulse - current behavior)
+                OutflowPhase.GatherInflow(
+                    state.W, state.H,
+                    (x, y) => state.Idx(x, y),
+                    state.ResourceLocal,
+                    state.RegionActivationTick,
+                    state.ResourceFirstTick,
+                    state.ActiveRegion,
+                    state.Active,
+                    state.Incoming,
+                    context.Tick
+                );
+            }
 
             // -----------------------------
             // D) Pass2: Apply inflow + viability
@@ -127,7 +180,10 @@ namespace Viable.Engine
                 state.RegionActivationTick,
                 state.ResourceFirstTick,
                 context.Tick,
-                context.Rng // Deterministic!
+                context.Rng,  // Deterministic!
+                cfg.ViabilityRule,           // Stage 13.7: Pass viability rule
+                cfg.HysteresisOnThreshold,   // Stage 13.7: Pass on threshold
+                cfg.HysteresisOffThreshold   // Stage 13.7: Pass off threshold
             );
 
             // -----------------------------
@@ -143,7 +199,10 @@ namespace Viable.Engine
                 state.W, state.H,
                 state.ComplexityMetric, state.ComplexityNext,
                 cfg.ComplexityDiffusionRate, cfg.ComplexityDecay,
-                state.IsSink
+                state.IsSink,
+                cfg.BoundaryMode,      // Stage 13.5: Pass boundary mode
+                cfg.DiffusionMode,     // Stage 13.6: Pass diffusion mode
+                state.DomainMask       // Stage 13.8: Pass domain mask
             );
 
             // Event emission could happen here (instead of Debug.Log)

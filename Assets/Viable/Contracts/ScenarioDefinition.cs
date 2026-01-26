@@ -53,5 +53,12 @@ namespace Viable.Contracts
         /// Plugin/extension identifiers for optional scenario behaviors.
         /// </summary>
         public string[] Plugins { get; set; } = new string[0];
+
+        /// <summary>
+        /// Engine mechanism configuration.
+        /// Stage 13: Enables behavioral preset diversity.
+        /// If null, defaults are used (preserves current behavior).
+        /// </summary>
+        public EngineConfig EngineConfig { get; set; }
     }
 }

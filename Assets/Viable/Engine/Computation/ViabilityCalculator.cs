@@ -1,10 +1,12 @@
 using System;
+using Viable.Contracts;
 
 namespace Viable.Engine.Computation
 {
     /// <summary>
     /// Core viability calculation logic extracted from SimulationController.
     /// Computes persistence viability based on incoming flow, resource, and complexity.
+    /// Stage 13.7: Adds hysteresis activation logic.
     /// </summary>
     public static class ViabilityCalculator
     {
@@ -61,6 +63,56 @@ namespace Viable.Engine.Computation
             // As resources deplete, scarcity ? 1, threshold increases
             float scarcity = 1f - (resourceGlobal / Math.Max(1f, resourceGlobalMax));
             return thresholdBase * (1f + scarcityK * scarcity);
+        }
+
+        /// <summary>
+        /// Determine active state based on viability rule and current state.
+        /// Stage 13.7: Implements hysteresis (separate on/off thresholds).
+        /// </summary>
+        /// <param name="viability">Current viability score</param>
+        /// <param name="currentActive">Current activation state (0=inactive, 1=active)</param>
+        /// <param name="resource">Current resource level</param>
+        /// <param name="minBudgetToPropagate">Minimum resource required for propagation</param>
+        /// <param name="viabilityRule">Activation rule (HardThreshold or Hysteresis)</param>
+        /// <param name="onThreshold">Hysteresis: threshold to turn ON (ignored for HardThreshold)</param>
+        /// <param name="offThreshold">Hysteresis: threshold to turn OFF (ignored for HardThreshold)</param>
+        /// <returns>New active state (0=inactive, 1=active)</returns>
+        public static byte DetermineActiveState(
+            float viability,
+            byte currentActive,
+            float resource,
+            float minBudgetToPropagate,
+            ViabilityRule viabilityRule,
+            double onThreshold,
+            double offThreshold)
+        {
+            // Resource gate: must have minimum resource to be active
+            if (resource <= minBudgetToPropagate)
+                return 0;
+
+            switch (viabilityRule)
+            {
+                case ViabilityRule.HardThreshold:
+                    // Default: Simple threshold (viability > 0)
+                    return (byte)(viability > 0f ? 1 : 0);
+
+                case ViabilityRule.Hysteresis:
+                    // Stage 13.7: Separate thresholds for activation and deactivation
+                    if (currentActive == 0)
+                    {
+                        // Currently inactive: need to exceed ON threshold to activate
+                        return (byte)(viability >= onThreshold ? 1 : 0);
+                    }
+                    else
+                    {
+                        // Currently active: need to drop below OFF threshold to deactivate
+                        return (byte)(viability > offThreshold ? 1 : 0);
+                    }
+
+                default:
+                    // Unknown rule: fallback to HardThreshold
+                    return (byte)(viability > 0f ? 1 : 0);
+            }
         }
     }
 }
