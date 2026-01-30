@@ -100,11 +100,15 @@ namespace Viable.Core.Unity.Controllers
         public SimulationGrid Grid;
         public CellVisualiser[,] views;
         private Rendering.GridRenderer gridRenderer;
-        private bool running = true;
+        private bool running = false; // CHANGED: Start paused, wait for user to press Play
 
         void Start()
         {
             InitializeSimulation();
+            
+            // Don't auto-start the simulation loop
+            // Wait for user to press Play button in UI
+            Debug.Log("[SimulationController] Simulation initialized. Press Play button to start.");
         }
 
         /// <summary>
@@ -220,7 +224,11 @@ namespace Viable.Core.Unity.Controllers
             );
             gridRenderer.ViabilityColorScale = 40f;
 
-            StartCoroutine(SimLoop());
+            // CHANGED: Don't auto-start the simulation loop
+            // User must press Play button in UI to start
+            // StartCoroutine(SimLoop()); // REMOVED
+            
+            Debug.Log("[SimulationController] Ready. Waiting for Play button.");
         }
 
         /// <summary>
