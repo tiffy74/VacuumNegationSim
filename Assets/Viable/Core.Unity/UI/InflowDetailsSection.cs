@@ -1,6 +1,9 @@
+using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using TMPro;
+using Viable.Core.Unity.Configuration;
+using Viable.Core.Unity.Controllers;
 
 namespace Viable.Core.Unity.UI
 {
@@ -14,6 +17,9 @@ namespace Viable.Core.Unity.UI
         [SerializeField] private TextMeshProUGUI pointSourceCountText;
         [SerializeField] private TextMeshProUGUI pointSourceListText;
         [SerializeField] private Button editPointSourcesButton;
+
+        [Header("Orchestrator")]
+        [SerializeField] private SimulationUIOrchestrator orchestrator;
 
         [Header("Point Source Editor Modal")]
         [SerializeField] private PointSourceEditorModal pointSourceEditorModal;
@@ -29,8 +35,29 @@ namespace Viable.Core.Unity.UI
             {
                 editPointSourcesButton.onClick.AddListener(OnEditPointSourcesClicked);
             }
+
+            // Initialize with a default config if none provided
+            if (currentConfig == null)
+            {
+                Debug.Log("[InflowDetailsSection] No config bound on Start, creating default config");
+                currentConfig = new Configuration.WorkingScenarioConfig();
+            }
+        }
+        /// <summary>
+        /// Refresh UI controls from WorkingScenarioConfig.
+        /// Called by orchestrator after preset load.
+        /// </summary>
+        public void Refresh(WorkingScenarioConfig cfg)
+        {
+            if (orchestrator != null && orchestrator.IsRefreshing())
+                return;
+
+            // Update the display using the existing UpdateDisplay logic
+            currentConfig = cfg;
+            UpdateDisplay();
         }
 
+        
         public override void Bind(Configuration.WorkingScenarioConfig config)
         {
             currentConfig = config;

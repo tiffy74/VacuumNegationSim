@@ -11,12 +11,12 @@ public class Stage12DiagnosticCheck : MonoBehaviour
         Debug.Log("=== Stage 12 Scene Diagnostic ===");
         
         // Check for required components
-        bool hasSimController = FindObjectOfType<Viable.Core.Unity.Controllers.SimulationController>() != null;
-        bool hasUIManager = FindObjectOfType<Viable.Core.Unity.UI.UIManager>() != null;
-        bool hasPresetSelector = FindObjectOfType<Viable.Core.Unity.UI.PresetSelectorUI>() != null;
-        bool hasSimControls = FindObjectOfType<Viable.Core.Unity.UI.SimulationControlsUI>() != null;
-        bool hasInfoDisplay = FindObjectOfType<Viable.Core.Unity.UI.InfoDisplayUI>() != null;
-        bool hasExportUI = FindObjectOfType<Viable.Core.Unity.UI.ExportUI>() != null;
+        bool hasSimController = FindFirstObjectByType<Viable.Core.Unity.Controllers.SimulationController>() != null;
+        bool hasUIManager = FindFirstObjectByType<Viable.Core.Unity.UI.UIManager>() != null;
+        bool hasPresetSelector = FindFirstObjectByType<Viable.Core.Unity.UI.PresetSelectorUI>() != null;
+        bool hasSimControls = FindFirstObjectByType<Viable.Core.Unity.UI.SimulationControlsUI>() != null;
+        bool hasInfoDisplay = FindFirstObjectByType<Viable.Core.Unity.UI.InfoDisplayUI>() != null;
+        bool hasExportUI = FindFirstObjectByType<Viable.Core.Unity.UI.ExportUI>() != null;
         
         // Report results
         Debug.Log($"SimulationController: {(hasSimController ? "? FOUND" : "? MISSING")}");

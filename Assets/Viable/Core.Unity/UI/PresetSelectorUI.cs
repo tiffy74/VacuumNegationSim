@@ -22,15 +22,43 @@ namespace Viable.Core.Unity.UI
         [Header("Settings")]
         [SerializeField] private string presetFolderPath = "Assets/Viable/Core.Unity/Presets/Examples";
 
+        [Header("Orchestrator")]
+        [SerializeField] private Controllers.SimulationUIOrchestrator orchestrator;
+
         private Controllers.SimulationController simulationController;
         private List<ScenarioPreset> availablePresets;
         private ScenarioPreset selectedPreset;
 
+        void Awake()
+        {
+            // Auto-wire orchestrator if not set
+            if (orchestrator == null)
+                orchestrator = FindFirstObjectByType<Controllers.SimulationUIOrchestrator>();
+        }
+
+        void Start()
+        {
+            // Initialize UI after orchestrator has loaded default preset
+            LoadAvailablePresets();
+            SetupUI();
+            
+            // If orchestrator has a current preset, select it in dropdown
+            if (orchestrator != null && orchestrator.CurrentPreset != null)
+            {
+                SelectPreset(orchestrator.CurrentPreset);
+            }
+        }
+
         public void Initialize(Controllers.SimulationController controller)
         {
             simulationController = controller;
-            LoadAvailablePresets();
-            SetupUI();
+            
+            // If Initialize is called manually, do setup
+            if (availablePresets == null || availablePresets.Count == 0)
+            {
+                LoadAvailablePresets();
+                SetupUI();
+            }
         }
 
         /// <summary>
@@ -38,20 +66,31 @@ namespace Viable.Core.Unity.UI
         /// </summary>
         private void LoadAvailablePresets()
         {
-            // Load presets from Resources folder
-            // Note: Presets must be in a Resources folder to be loaded at runtime
             availablePresets = new List<ScenarioPreset>();
 
-            // Try loading from Resources/Presets/Examples
+#if UNITY_EDITOR
+            // Editor: Load from anywhere using AssetDatabase
+            string[] guids = UnityEditor.AssetDatabase.FindAssets("t:ScenarioPreset", new[] { "Assets/Viable/Core.Unity/Presets/Examples" });
+            foreach (string guid in guids)
+            {
+                string path = UnityEditor.AssetDatabase.GUIDToAssetPath(guid);
+                var preset = UnityEditor.AssetDatabase.LoadAssetAtPath<ScenarioPreset>(path);
+                if (preset != null)
+                {
+                    availablePresets.Add(preset);
+                }
+            }
+#else
+            // Runtime: Load from Resources folder
             var presets = Resources.LoadAll<ScenarioPreset>("Presets/Examples");
             availablePresets.AddRange(presets);
 
-            // Also try just Resources/Presets
             if (availablePresets.Count == 0)
             {
                 presets = Resources.LoadAll<ScenarioPreset>("Presets");
                 availablePresets.AddRange(presets);
             }
+#endif
 
             // Sort by name
             availablePresets = availablePresets.OrderBy(p => p.PresetName).ToList();
@@ -81,11 +120,9 @@ namespace Viable.Core.Unity.UI
             // Wire load button
             loadButton.onClick.AddListener(OnLoadButtonClicked);
 
-            // Select first preset by default
-            if (availablePresets.Count > 0)
-            {
-                OnPresetSelected(0);
-            }
+            // DON'T select a preset here - let orchestrator do it in Start()
+            // This ensures the default preset from orchestrator is respected
+            Debug.Log($"[PresetSelectorUI] Dropdown populated with {availablePresets.Count} presets. Waiting for orchestrator to set default.");
         }
 
         /// <summary>
@@ -108,10 +145,34 @@ namespace Viable.Core.Unity.UI
             {
                 feedbackText.text = "";
             }
+            
+            // Load preset into orchestrator (doesn't apply until user clicks Apply button)
+            if (orchestrator != null)
+            {
+                orchestrator.LoadPreset(selectedPreset);
+            }
+        }
+
+        /// <summary>
+        /// Programmatically select a preset by reference.
+        /// Used by orchestrator to sync dropdown on startup.
+        /// </summary>
+        public void SelectPreset(ScenarioPreset preset)
+        {
+            if (preset == null || availablePresets == null) return;
+
+            int index = availablePresets.IndexOf(preset);
+            if (index >= 0)
+            {
+                presetDropdown.SetValueWithoutNotify(index);
+                OnPresetSelected(index);
+            }
         }
 
         /// <summary>
         /// Called when user clicks Load button.
+        /// NOTE: This is deprecated - use TopBar Apply button instead.
+        /// Kept for backward compatibility but now just shows message.
         /// </summary>
         private void OnLoadButtonClicked()
         {
@@ -121,26 +182,9 @@ namespace Viable.Core.Unity.UI
                 return;
             }
 
-            if (simulationController == null)
-            {
-                ShowFeedback("SimulationController not found!", Color.red);
-                return;
-            }
-
-            try
-            {
-                // Load preset into SimulationController
-                // This requires adding a method to SimulationController
-                LoadPresetIntoController(selectedPreset);
-
-                ShowFeedback($"Loaded: {selectedPreset.PresetName}", Color.green);
-                Debug.Log($"[PresetSelectorUI] Loaded preset: {selectedPreset.PresetName}");
-            }
-            catch (System.Exception ex)
-            {
-                ShowFeedback($"Error: {ex.Message}", Color.red);
-                Debug.LogError($"[PresetSelectorUI] Failed to load preset: {ex.Message}");
-            }
+            // Show message that changes are pending Apply
+            ShowFeedback($"Selected: {selectedPreset.PresetName}. Click Apply in TopBar to restart simulation.", Color.yellow);
+            Debug.Log($"[PresetSelectorUI] Preset selected: {selectedPreset.PresetName} (pending Apply)");
         }
 
         /// <summary>

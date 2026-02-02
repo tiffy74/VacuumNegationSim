@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using Viable.Core.Unity.Controllers;
 
 namespace Viable.Core.Unity.UI
 {
@@ -24,6 +25,9 @@ namespace Viable.Core.Unity.UI
         [SerializeField] private GameObject inflowDetailsSection;
         [SerializeField] private GameObject diffusionDetailsSection;
         [SerializeField] private GameObject viabilityDetailsSection;
+
+        [Header("Orchestrator")]
+        [SerializeField] private SimulationUIOrchestrator orchestrator;
 
         private GameObject currentlyActiveSection;
 

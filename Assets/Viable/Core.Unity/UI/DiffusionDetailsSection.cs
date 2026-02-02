@@ -1,7 +1,9 @@
+using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using TMPro;
-using System.Collections.Generic;
+using Viable.Core.Unity.Configuration;
+using Viable.Core.Unity.Controllers;
 
 namespace Viable.Core.Unity.UI
 {
@@ -15,6 +17,9 @@ namespace Viable.Core.Unity.UI
         [SerializeField] private TMP_Dropdown directionDropdown;
         [SerializeField] private Slider biasSlider;
         [SerializeField] private TextMeshProUGUI biasValueText;
+
+        [Header("Orchestrator")]
+        [SerializeField] private SimulationUIOrchestrator orchestrator;
 
         private Configuration.WorkingScenarioConfig currentConfig;
 
@@ -59,6 +64,25 @@ namespace Viable.Core.Unity.UI
                 biasSlider.value = config.AnisotropicBias;
 
             UpdateBiasValueText(config.AnisotropicBias);
+        }
+
+        /// <summary>
+        /// Refresh UI controls from WorkingScenarioConfig.
+        /// </summary>
+        public void Refresh(WorkingScenarioConfig cfg)
+        {
+            if (orchestrator != null && orchestrator.IsRefreshing())
+                return;
+
+            // Set anisotropic diffusion controls
+            if (directionDropdown != null)
+                directionDropdown.SetValueWithoutNotify((int)cfg.AnisotropicDirection);
+
+            if (biasSlider != null)
+                biasSlider.SetValueWithoutNotify(cfg.AnisotropicBias);
+
+            if (biasValueText != null)
+                biasValueText.text = cfg.AnisotropicBias.ToString("F2");
         }
 
         public override void RefreshVisibility(Configuration.WorkingScenarioConfig config)

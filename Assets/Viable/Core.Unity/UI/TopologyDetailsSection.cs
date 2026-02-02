@@ -1,7 +1,9 @@
+using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using TMPro;
-using System.Collections.Generic;
+using Viable.Core.Unity.Configuration;
+using Viable.Core.Unity.Controllers;
 
 namespace Viable.Core.Unity.UI
 {
@@ -23,6 +25,9 @@ namespace Viable.Core.Unity.UI
         [SerializeField] private GameObject radiusInnerRow;
         [SerializeField] private GameObject corridorWidthRow;
         [SerializeField] private GameObject percolationProbRow;
+
+        [Header("Orchestrator")]
+        [SerializeField] private SimulationUIOrchestrator orchestrator;
 
         private Configuration.WorkingScenarioConfig currentConfig;
 
@@ -57,6 +62,31 @@ namespace Viable.Core.Unity.UI
 
             if (percolationProbInput != null)
                 percolationProbInput.onEndEdit.AddListener(OnPercolationProbChanged);
+        }
+
+        /// <summary>
+        /// Refresh UI controls from WorkingScenarioConfig.
+        /// </summary>
+        public void Refresh(WorkingScenarioConfig cfg)
+        {
+            if (orchestrator != null && orchestrator.IsRefreshing())
+                return;
+
+            // Set topology/mask controls
+            if (maskShapeDropdown != null)
+                maskShapeDropdown.SetValueWithoutNotify((int)cfg.MaskType);
+
+            if (radiusOuterInput != null)
+                radiusOuterInput.SetTextWithoutNotify(cfg.MaskRadiusOuter.ToString("F1"));
+
+            if (radiusInnerInput != null)
+                radiusInnerInput.SetTextWithoutNotify(cfg.MaskRadiusInner.ToString("F1"));
+
+            if (corridorWidthInput != null)
+                corridorWidthInput.SetTextWithoutNotify(cfg.MaskCorridorWidth.ToString("F1"));
+
+            if (percolationProbInput != null)
+                percolationProbInput.SetTextWithoutNotify(cfg.MaskPercolationProbability.ToString("F2"));
         }
 
         public override void Bind(Configuration.WorkingScenarioConfig config)

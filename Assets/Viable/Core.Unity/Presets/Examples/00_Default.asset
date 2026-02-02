@@ -1,0 +1,90 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8662d90e0f66f154a872e45fd4e506e8, type: 3}
+  m_Name: 00_Default
+  m_EditorClassIdentifier: 
+  PresetId: constraints-expansion-demo
+  PresetName: Default
+  Description: "Original simulation demonstrating configuration space expansion with
+    constraint-based dynamics.\r\n\r\nThis preset preserves the exact behavior of
+    the simulation used for research validation and manuscript preparation.\r\n\r\nDO
+    NOT MODIFY - Used for reproducibility and export verification.\r"
+  GridWidth: 64
+  GridHeight: 64
+  InitialResourceGlobal: 10000000
+  ScaleFactor: 1
+  DeltaTime: 1
+  Parameters:
+  - Key: resourceGlobalMax
+    Value: 50000000
+  - Key: globalReplenishPerTick
+    Value: 200
+  - Key: minResourceForPersistenc
+    Value: 5
+  - Key: ethreshBase
+    Value: 0.18
+  - Key: globalScarcityK
+    Value: 0.3
+  - Key: decayLoss
+    Value: 0.003
+  - Key: propagateFrac
+    Value: 0.25
+  - Key: minBudgetToPropagate
+    Value: 0.1
+  - Key: activationCost
+    Value: 0.25
+  - Key: complexityGainPerUse
+    Value: 0.2
+  - Key: complexityDiffusionRate
+    Value: 0.2
+  - Key: complexityDecay
+    Value: 0.02
+  - Key: resourceLocalMax
+    Value: 50000
+  - Key: perturbationProbability
+    Value: 0.0002
+  - Key: perturbationComplexity
+    Value: 0.5
+  - Key: expansionRate
+    Value: 1
+  - Key: matterAheadThreshold
+    Value: 0
+  - Key: sinkFormationThreshold
+    Value: 0.5
+  - Key: sinkDrainFraction
+    Value: 0
+  - Key: sinkRecoilFraction
+    Value: 0
+  - Key: regionExpansionChance
+    Value: 0.25
+  - Key: regionExpansionCost
+    Value: 0.05
+  - Key: regionExpansionMinSource
+    Value: 0.1
+  - Key: regionExpansionRequiresViability
+    Value: 0
+  - Key: regionExpansionSeedsResource
+    Value: 1
+  - Key: regionSeedResource
+    Value: 0.1
+  - Key: complexityGainFromGradient
+    Value: 0.02
+  - Key: complexityGainNearSink
+    Value: 0.05
+  - Key: complexityViabilityGainA
+    Value: 0.5
+  - Key: regionExpansionMinSource
+    Value: 1
+  InactiveColor: {r: 0.1844808, g: 0.03724635, b: 0.2924528, a: 1}
+  DormantRegionColor: {r: 0, g: 0, b: 0.5019608, a: 1}
+  ShowComplexityTint: 0
+  TicksPerSecond: 10

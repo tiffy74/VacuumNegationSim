@@ -42,7 +42,7 @@ namespace Viable.Core.Unity.UI
             // Find SimulationController if not assigned
             if (simulationController == null)
             {
-                simulationController = FindObjectOfType<Controllers.SimulationController>();
+                simulationController = FindFirstObjectByType<Controllers.SimulationController>();
                 if (simulationController == null)
                 {
                     Debug.LogError("[UIManager] SimulationController not found!");

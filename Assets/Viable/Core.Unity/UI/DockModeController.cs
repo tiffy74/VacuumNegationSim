@@ -1,5 +1,6 @@
-using UnityEngine;
 using TMPro;
+using UnityEngine;
+using Viable.Core.Unity.Controllers;
 
 namespace Viable.Core.Unity.UI
 {
@@ -17,6 +18,9 @@ namespace Viable.Core.Unity.UI
         [SerializeField] private GameObject setupPanel;
         [SerializeField] private GameObject inspectPanel;
         [SerializeField] private GameObject exportPanel;
+
+        [Header("Orchestrator")]
+        [SerializeField] private SimulationUIOrchestrator orchestrator;
 
         private void Start()
         {

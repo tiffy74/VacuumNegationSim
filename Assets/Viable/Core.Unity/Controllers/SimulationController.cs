@@ -85,6 +85,14 @@ namespace Viable.Core.Unity.Controllers
         [SerializeField] private float SinkFormationThreshold = 0.5f;
         [SerializeField] private float SinkDrainFraction = 0f;
         [SerializeField] private float SinkRecoilFraction = 0f;
+        
+        [Header("Initial Sink Placement")]
+        [Tooltip("Number of sinks to place at simulation start (0 = none, sinks form naturally)")]
+        [SerializeField] private int InitialSinkCount = 0;
+        [Tooltip("Spacing between sinks in grid pattern")]
+        [SerializeField] private float SinkSpacing = 10f;
+        [Tooltip("Random offset for sink positions (0 = perfect grid, 1 = fully random)")]
+        [SerializeField][Range(0f, 1f)] private float SinkRandomness = 0f;
 
         [Header("Visualization")]
         [SerializeField] private Color InactiveColor = new Color(0.05f, 0.05f, 0.08f, 1f);
@@ -255,7 +263,7 @@ namespace Viable.Core.Unity.Controllers
                 ComplexityDiffusionRate = ComplexityDiffusionRate,
                 ComplexityDecay = ComplexityDecay,
 
-                ResourceLocalMax = ResourceLocalMax,
+                ResourceLocalMax = ResourceGlobalMax,
                 PerturbationProbability = PerturbationProbability,
                 PerturbationComplexity = PerturbationComplexity,
 
@@ -380,8 +388,99 @@ namespace Viable.Core.Unity.Controllers
                 }
             }
 
+            // Place initial sinks if configured
+            if (InitialSinkCount > 0)
+            {
+                PlaceInitialSinks(s, ctx);
+            }
+
             QualitySettings.vSyncCount = 0;
             Application.targetFrameRate = 120;
+        }
+
+        /// <summary>
+        /// Place initial sinks in grid or random pattern.
+        /// Stage 13.5: Allows user to control sink placement.
+        /// </summary>
+        private void PlaceInitialSinks(GridState s, StepContext ctx)
+        {
+            int sinksPlaced = 0;
+            
+            // Get seed from preset or use random
+            int seed = (scenarioPreset != null && scenarioPreset.Seed.HasValue) 
+                ? scenarioPreset.Seed.Value 
+                : System.Environment.TickCount;
+            
+            if (SinkRandomness >= 0.99f)
+            {
+                // Fully random placement
+                var random = new System.Random(seed);
+                
+                while (sinksPlaced < InitialSinkCount)
+                {
+                    int x = random.Next(0, s.W);
+                    int y = random.Next(0, s.H);
+                    int idx = s.Idx(x, y);
+                    
+                    // Don't place on central seed region
+                    int cx = s.W / 2;
+                    int cy = s.H / 2;
+                    if (Mathf.Abs(x - cx) <= 3 && Mathf.Abs(y - cy) <= 3)
+                        continue;
+                    
+                    // Don't place on existing sink
+                    if (s.IsSink[idx])
+                        continue;
+                    
+                    s.IsSink[idx] = true;
+                    sinksPlaced++;
+                    
+                    Debug.Log($"[SimulationController] Placed random sink {sinksPlaced} at ({x}, {y})");
+                }
+            }
+            else
+            {
+                // Grid pattern with optional randomness
+                int sinksPerSide = Mathf.CeilToInt(Mathf.Sqrt(InitialSinkCount));
+                float spacing = SinkSpacing > 0 ? SinkSpacing : (s.W / (float)(sinksPerSide + 1));
+                
+                var random = new System.Random(seed);
+                
+                for (int sy = 0; sy < sinksPerSide && sinksPlaced < InitialSinkCount; sy++)
+                {
+                    for (int sx = 0; sx < sinksPerSide && sinksPlaced < InitialSinkCount; sx++)
+                    {
+                        // Base grid position
+                        float baseX = (sx + 1) * spacing;
+                        float baseY = (sy + 1) * spacing;
+                        
+                        // Add randomness
+                        float offsetX = (float)(random.NextDouble() - 0.5) * spacing * SinkRandomness;
+                        float offsetY = (float)(random.NextDouble() - 0.5) * spacing * SinkRandomness;
+                        
+                        int x = Mathf.Clamp((int)(baseX + offsetX), 0, s.W - 1);
+                        int y = Mathf.Clamp((int)(baseY + offsetY), 0, s.H - 1);
+                        
+                        // Don't place on central seed region
+                        int cx = s.W / 2;
+                        int cy = s.H / 2;
+                        if (Mathf.Abs(x - cx) <= 3 && Mathf.Abs(y - cy) <= 3)
+                            continue;
+                        
+                        int idx = s.Idx(x, y);
+                        
+                        if (!s.IsSink[idx])
+                        {
+                            s.IsSink[idx] = true;
+                            sinksPlaced++;
+                            
+                            Debug.Log($"[SimulationController] Placed grid sink {sinksPlaced} at ({x}, {y})");
+                        }
+                    }
+                }
+            }
+            
+            Debug.Log($"[SimulationController] Placed {sinksPlaced}/{InitialSinkCount} initial sinks");
         }
 
         void TickSimulation()
@@ -699,6 +798,84 @@ namespace Viable.Core.Unity.Controllers
             InitializeSimulation();
 
             Debug.Log($"[SimulationController] Preset loaded: {preset.PresetName}");
+        }
+
+        /// <summary>
+        /// Restart simulation with a new ScenarioDefinition and RunRequest.
+        /// CRITICAL: This is the ONLY entry point for UI-driven restarts.
+        /// Called by: SimulationUIOrchestrator.ApplyAndRestart()
+        /// </summary>
+        public void RestartWithScenario(ScenarioDefinition scenario, RunRequest request)
+        {
+            if (scenario == null)
+            {
+                Debug.LogError("[SimulationController] Cannot restart with null scenario");
+                return;
+            }
+
+            Debug.Log($"[SimulationController] RestartWithScenario: {scenario.ScenarioId}");
+
+            // Stop current simulation
+            Pause();
+            StopAllCoroutines();
+
+            // Store for export
+            lastScenario = scenario;
+            lastRequest = request;
+            lastResult = null; // Reset result
+
+            // Update grid size if changed
+            int gridWidth = scenario.GridWidth;
+            int gridHeight = scenario.GridHeight;
+
+            // Check if grid size changed
+            bool gridSizeChanged = (state != null && (state.W != gridWidth || state.H != gridHeight));
+
+            if (gridSizeChanged)
+            {
+                Debug.Log($"[SimulationController] Grid size changed: {gridWidth}×{gridHeight}");
+                Grid.Width = gridWidth;
+                Grid.Height = gridHeight;
+
+                // Respawn visual cells
+                views = new CellVisualiser[gridWidth, gridHeight];
+                Grid.SpawnVisualCells(views);
+            }
+
+            // Build SimulationConfiguration from ScenarioDefinition
+            config = ScenarioPresetAdapter.ToSimulationConfiguration(scenario);
+
+            // Create new GridState
+            state = new GridState(gridWidth, gridHeight);
+
+            // Create new StepContext
+            float resourceGlobal = scenario.Parameters != null && scenario.Parameters.ContainsKey("resourceGlobalMax")
+                ? (float)scenario.Parameters["resourceGlobalMax"] * 0.2f // Start at 20% of max
+                : config.ResourceGlobalMax * 0.2f;
+
+            context = new StepContext(config, resourceGlobal, ScaleFactor, scenario.Seed);
+
+            // Initialize state
+            InitStateInto(state, context);
+
+            // Rebuild phase pipeline with new configuration
+            string phaseSetId = scenario.EngineConfig?.PhaseSetId ?? "default";
+            var phases = BuildPhasePipeline(phaseSetId);
+
+            // Create new runner
+            runner = new SimulationRunner(state, phases);
+
+            // Recreate renderer if grid size changed
+            if (gridSizeChanged || gridRenderer == null)
+            {
+                gridRenderer = new Rendering.GridRenderer(
+                    gridWidth, gridHeight, views,
+                    InactiveColor, DormantRegionColor, ShowComplexityTint
+                );
+                gridRenderer.ViabilityColorScale = 40f;
+            }
+
+            Debug.Log($"[SimulationController] Restart complete. Ready to play.");
         }
 
         /// <summary>

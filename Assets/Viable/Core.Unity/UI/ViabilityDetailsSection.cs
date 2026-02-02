@@ -1,6 +1,8 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using TMPro;
+using Viable.Core.Unity.Configuration;
+using Viable.Core.Unity.Controllers;
 
 namespace Viable.Core.Unity.UI
 {
@@ -14,6 +16,9 @@ namespace Viable.Core.Unity.UI
         [SerializeField] private TMP_InputField onThresholdInput;
         [SerializeField] private TMP_InputField offThresholdInput;
         [SerializeField] private TextMeshProUGUI explanationText;
+
+        [Header("Orchestrator")]
+        [SerializeField] private SimulationUIOrchestrator orchestrator;
 
         private Configuration.WorkingScenarioConfig currentConfig;
 
@@ -48,7 +53,21 @@ namespace Viable.Core.Unity.UI
             if (offThresholdInput != null)
                 offThresholdInput.text = config.HysteresisOffThreshold.ToString("F2");
         }
+        /// <summary>
+        /// Refresh UI controls from WorkingScenarioConfig.
+        /// </summary>
+        public void Refresh(WorkingScenarioConfig cfg)
+        {
+            if (orchestrator != null && orchestrator.IsRefreshing())
+                return;
 
+            // Set hysteresis threshold controls
+            if (onThresholdInput != null)
+                onThresholdInput.SetTextWithoutNotify(cfg.HysteresisOnThreshold.ToString("F2"));
+
+            if (offThresholdInput != null)
+                offThresholdInput.SetTextWithoutNotify(cfg.HysteresisOffThreshold.ToString("F2"));
+        }
         public override void RefreshVisibility(Configuration.WorkingScenarioConfig config)
         {
             // Show only when ViabilityRule = Hysteresis

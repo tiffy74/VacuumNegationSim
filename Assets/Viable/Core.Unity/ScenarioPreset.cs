@@ -46,6 +46,10 @@ namespace Viable.Core.Unity
         [Tooltip("Core simulation parameters - add as needed")]
         public List<ParameterEntry> Parameters = new List<ParameterEntry>();
 
+        [Header("Mechanism Configuration")]
+        [Tooltip("Mechanism modes (Inflow, Boundary, Diffusion, etc.) - optional, uses defaults if not set")]
+        public EngineConfigData MechanismConfig = new EngineConfigData();
+
         [Header("Visualization")]
         [Tooltip("Inactive cell color")]
         public Color InactiveColor = new Color(0.05f, 0.05f, 0.08f, 1f);
@@ -109,5 +113,47 @@ namespace Viable.Core.Unity
     {
         public string Key;
         public double Value;
+    }
+
+    /// <summary>
+    /// Serializable mechanism configuration for presets.
+    /// Stores mechanism modes that define simulation behavior.
+    /// </summary>
+    [Serializable]
+    public class EngineConfigData
+    {
+        [Header("Mechanism Modes")]
+        [Tooltip("How resources flow into the system")]
+        public Configuration.InflowMode InflowMode = Configuration.InflowMode.UniformField;
+
+        [Tooltip("How boundaries behave (wrap, absorb, reflect)")]
+        public Configuration.BoundaryMode BoundaryMode = Configuration.BoundaryMode.Wrap;
+
+        [Tooltip("Diffusion pattern (4-neighbor, 8-neighbor, anisotropic)")]
+        public Configuration.DiffusionMode DiffusionMode = Configuration.DiffusionMode.Moore8;
+
+        [Tooltip("Viability rule (simple threshold, hysteresis)")]
+        public Configuration.ViabilityRuleMode ViabilityRule = Configuration.ViabilityRuleMode.Simple;
+
+        [Tooltip("Grid topology (full domain, masked domain)")]
+        public Configuration.TopologyMode TopologyMode = Configuration.TopologyMode.FullDomain;
+
+        [Header("Topology Details (when MaskedDomain)")]
+        public Configuration.MaskShape MaskShape = Configuration.MaskShape.Circle;
+        public float MaskRadiusOuter = 20f;
+        public float MaskRadiusInner = 10f;
+        public float MaskCorridorWidth = 8f;
+        public float MaskPercolationProbability = 0.3f;
+
+        [Header("Point Sources (when InflowMode = PointSources)")]
+        public List<Configuration.PointSourceData> PointSources = new List<Configuration.PointSourceData>();
+
+        [Header("Hysteresis (when ViabilityRule = Hysteresis)")]
+        public float HysteresisOnThreshold = 0.5f;
+        public float HysteresisOffThreshold = -0.5f;
+
+        [Header("Anisotropic Diffusion (when DiffusionMode = Anisotropic)")]
+        public Configuration.DiffusionDirection AnisotropicDirection = Configuration.DiffusionDirection.North;
+        public float AnisotropicBias = 0.7f;
     }
 }

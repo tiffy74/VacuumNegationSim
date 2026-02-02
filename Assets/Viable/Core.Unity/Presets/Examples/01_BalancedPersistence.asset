@@ -43,7 +43,23 @@ MonoBehaviour:
     Value: 0.02
   - Key: perturbationProbability
     Value: 0.0002
-  InactiveColor: {r: 0.019607844, g: 0.019607844, b: 0.03137255, a: 1}
-  DormantRegionColor: {r: 0.05882353, g: 0, b: 0.09803922, a: 1}
+  MechanismConfig:
+    InflowMode: 0
+    BoundaryMode: 2
+    DiffusionMode: 1
+    ViabilityRule: 0
+    TopologyMode: 0
+    MaskShape: 1
+    MaskRadiusOuter: 20
+    MaskRadiusInner: 10
+    MaskCorridorWidth: 8
+    MaskPercolationProbability: 0.3
+    PointSources: []
+    HysteresisOnThreshold: 0.5
+    HysteresisOffThreshold: -0.5
+    AnisotropicDirection: 0
+    AnisotropicBias: 0.7
+  InactiveColor: {r: 0.990566, g: 0.032707386, b: 0.42678353, a: 1}
+  DormantRegionColor: {r: 0.023139905, g: 0.9811321, b: 0.07589304, a: 1}
   ShowComplexityTint: 0
   TicksPerSecond: 10

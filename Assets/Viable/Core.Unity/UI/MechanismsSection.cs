@@ -1,9 +1,11 @@
-using UnityEngine;
-using UnityEngine.UI;
-using UnityEngine.Events;
-using TMPro;
 using System;
 using System.Collections.Generic;
+using TMPro;
+using UnityEngine;
+using UnityEngine.Events;
+using UnityEngine.UI;
+using Viable.Core.Unity.Configuration;
+using Viable.Core.Unity.Controllers;
 
 namespace Viable.Core.Unity.UI
 {
@@ -25,6 +27,9 @@ namespace Viable.Core.Unity.UI
         [Header("External References")]
         [SerializeField] private TextMeshProUGUI mechanismSummaryText;
 
+        [Header("Orchestrator")]
+        [SerializeField] private SimulationUIOrchestrator orchestrator;
+
         [Header("Events")]
         [Tooltip("Invoked when any mechanism dropdown changes - use to refresh detail sections")]
         public UnityEvent OnMechanismChanged = new UnityEvent();
@@ -35,13 +40,12 @@ namespace Viable.Core.Unity.UI
         {
             base.Start();
 
+            Debug.Log("[MechanismsSection] Start() called - populating dropdowns");
+
             // Populate dropdowns
-            PopulateTopologyDropdown();
-            PopulateBoundaryDropdown();
-            PopulateInflowDropdown();
-            PopulateDiffusionDropdown();
-            PopulateViabilityDropdown();
-            PopulatePhaseSetDropdown();
+            PopulateAllDropdowns();
+
+            Debug.Log("[MechanismsSection] Dropdowns populated");
 
             // Wire change listeners
             if (topologyDropdown != null)
@@ -63,22 +67,84 @@ namespace Viable.Core.Unity.UI
                 phaseSetDropdown.onValueChanged.AddListener(_ => OnDropdownChanged());
         }
 
+        /// <summary>
+        /// Refresh UI controls from WorkingScenarioConfig.
+        /// Called by orchestrator after preset load.
+        /// </summary>
+        public void Refresh(WorkingScenarioConfig cfg)
+        {
+            // Check if we're in a refresh cycle to avoid loops
+            if (orchestrator != null && orchestrator.IsRefreshing())
+                return;
+
+            // Set dropdown values WITHOUT triggering OnValueChanged events
+            // Assuming you have these dropdowns (adjust names to match your actual fields):
+            if (topologyDropdown != null)
+                topologyDropdown.SetValueWithoutNotify((int)cfg.Topology);
+
+            if (boundaryDropdown != null)
+                boundaryDropdown.SetValueWithoutNotify((int)cfg.Boundary);
+
+            if (inflowDropdown != null)
+                inflowDropdown.SetValueWithoutNotify((int)cfg.Inflow);
+
+            if (diffusionDropdown != null)
+                diffusionDropdown.SetValueWithoutNotify((int)cfg.Diffusion);
+
+            if (viabilityDropdown != null)
+                viabilityDropdown.SetValueWithoutNotify((int)cfg.ViabilityRule);
+        }
+        private void OnEnable()
+        {
+            // Populate dropdowns when section becomes visible
+            // This handles the case where Start() hasn't been called yet because GameObject was inactive
+            Debug.Log("[MechanismsSection] OnEnable() called");
+            PopulateAllDropdowns();
+        }
+
+        private void PopulateAllDropdowns()
+        {
+            PopulateTopologyDropdown();
+            PopulateBoundaryDropdown();
+            PopulateInflowDropdown();
+            PopulateDiffusionDropdown();
+            PopulateViabilityDropdown();
+            PopulatePhaseSetDropdown();
+        }
+
         #region Populate Dropdowns
 
         private void PopulateTopologyDropdown()
         {
-            if (topologyDropdown == null) return;
+            if (topologyDropdown == null)
+            {
+                Debug.LogError("[MechanismsSection] topologyDropdown is NULL!");
+                return;
+            }
+            
+            Debug.Log($"[MechanismsSection] Populating Topology dropdown (name: {topologyDropdown.name}, current options: {topologyDropdown.options.Count})");
             topologyDropdown.ClearOptions();
             topologyDropdown.AddOptions(new List<string>
             {
                 "Full Domain",
                 "Masked Domain"
             });
+            Debug.Log($"[MechanismsSection] Topology dropdown populated with {topologyDropdown.options.Count} options:");
+            foreach (var opt in topologyDropdown.options)
+            {
+                Debug.Log($"  - {opt.text}");
+            }
         }
 
         private void PopulateBoundaryDropdown()
         {
-            if (boundaryDropdown == null) return;
+            if (boundaryDropdown == null)
+            {
+                Debug.LogError("[MechanismsSection] boundaryDropdown is NULL!");
+                return;
+            }
+            
+            Debug.Log($"[MechanismsSection] Populating Boundary dropdown (name: {boundaryDropdown.name}, current options: {boundaryDropdown.options.Count})");
             boundaryDropdown.ClearOptions();
             boundaryDropdown.AddOptions(new List<string>
             {
@@ -86,11 +152,22 @@ namespace Viable.Core.Unity.UI
                 "Open (Absorbing)",
                 "Wrap (Periodic)"
             });
+            Debug.Log($"[MechanismsSection] Boundary dropdown populated with {boundaryDropdown.options.Count} options:");
+            foreach (var opt in boundaryDropdown.options)
+            {
+                Debug.Log($"  - {opt.text}");
+            }
         }
 
         private void PopulateInflowDropdown()
         {
-            if (inflowDropdown == null) return;
+            if (inflowDropdown == null)
+            {
+                Debug.LogError("[MechanismsSection] inflowDropdown is NULL!");
+                return;
+            }
+            
+            Debug.Log($"[MechanismsSection] Populating Inflow dropdown (name: {inflowDropdown.name}, current options: {inflowDropdown.options.Count})");
             inflowDropdown.ClearOptions();
             inflowDropdown.AddOptions(new List<string>
             {
@@ -98,11 +175,22 @@ namespace Viable.Core.Unity.UI
                 "Point Sources",
                 "Edge Sources"
             });
+            Debug.Log($"[MechanismsSection] Inflow dropdown populated with {inflowDropdown.options.Count} options:");
+            foreach (var opt in inflowDropdown.options)
+            {
+                Debug.Log($"  - {opt.text}");
+            }
         }
 
         private void PopulateDiffusionDropdown()
         {
-            if (diffusionDropdown == null) return;
+            if (diffusionDropdown == null)
+            {
+                Debug.LogError("[MechanismsSection] diffusionDropdown is NULL!");
+                return;
+            }
+            
+            Debug.Log($"[MechanismsSection] Populating Diffusion dropdown (name: {diffusionDropdown.name}, current options: {diffusionDropdown.options.Count})");
             diffusionDropdown.ClearOptions();
             diffusionDropdown.AddOptions(new List<string>
             {
@@ -110,28 +198,55 @@ namespace Viable.Core.Unity.UI
                 "Moore (8-neighbor)",
                 "Anisotropic"
             });
+            Debug.Log($"[MechanismsSection] Diffusion dropdown populated with {diffusionDropdown.options.Count} options:");
+            foreach (var opt in diffusionDropdown.options)
+            {
+                Debug.Log($"  - {opt.text}");
+            }
         }
 
         private void PopulateViabilityDropdown()
         {
-            if (viabilityDropdown == null) return;
+            if (viabilityDropdown == null)
+            {
+                Debug.LogError("[MechanismsSection] viabilityDropdown is NULL!");
+                return;
+            }
+            
+            Debug.Log($"[MechanismsSection] Populating Viability dropdown (name: {viabilityDropdown.name}, current options: {viabilityDropdown.options.Count})");
             viabilityDropdown.ClearOptions();
             viabilityDropdown.AddOptions(new List<string>
             {
                 "Simple Threshold",
                 "Hysteresis"
             });
+            Debug.Log($"[MechanismsSection] Viability dropdown populated with {viabilityDropdown.options.Count} options:");
+            foreach (var opt in viabilityDropdown.options)
+            {
+                Debug.Log($"  - {opt.text}");
+            }
         }
 
         private void PopulatePhaseSetDropdown()
         {
-            if (phaseSetDropdown == null) return;
+            if (phaseSetDropdown == null)
+            {
+                Debug.LogError("[MechanismsSection] phaseSetDropdown is NULL!");
+                return;
+            }
+            
+            Debug.Log($"[MechanismsSection] Populating PhaseSet dropdown (name: {phaseSetDropdown.name}, current options: {phaseSetDropdown.options.Count})");
             phaseSetDropdown.ClearOptions();
             phaseSetDropdown.AddOptions(new List<string>
             {
                 "Standard",
                 "Custom (Advanced)"
             });
+            Debug.Log($"[MechanismsSection] PhaseSet dropdown populated with {phaseSetDropdown.options.Count} options:");
+            foreach (var opt in phaseSetDropdown.options)
+            {
+                Debug.Log($"  - {opt.text}");
+            }
         }
 
         #endregion

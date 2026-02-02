@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using System.Linq;
 
 namespace Viable.Core.Unity.UI
 {
@@ -32,10 +33,17 @@ namespace Viable.Core.Unity.UI
         private Configuration.WorkingScenarioConfig workingConfig;
         private bool isPlaying = false;
 
-        public void Initialize(Controllers.SimulationController controller, Configuration.WorkingScenarioConfig config)
+        private void Start()
         {
-            simulationController = controller;
-            workingConfig = config;
+            // Find SimulationController if not assigned
+            if (simulationController == null)
+            {
+                simulationController = FindFirstObjectByType<Controllers.SimulationController>();
+            }
+
+            // Populate dropdowns on start
+            PopulateSpeedDropdown();
+            PopulatePresetDropdown();
 
             // Wire buttons
             if (loadButton != null)
@@ -62,11 +70,44 @@ namespace Viable.Core.Unity.UI
                 seedInput.onEndEdit.AddListener(OnSeedChanged);
             }
 
-            // Populate speed dropdown
-            PopulateSpeedDropdown();
+            UpdatePlayPauseButton();
 
-            // Load preset list
+            Debug.Log("[TopBarUI] Initialized");
+        }
+
+        public void Initialize(Controllers.SimulationController controller, Configuration.WorkingScenarioConfig config)
+        {
+            simulationController = controller;
+            workingConfig = config;
+
+            // Populate dropdowns
+            PopulateSpeedDropdown();
             PopulatePresetDropdown();
+
+            // Wire buttons
+            if (loadButton != null)
+                loadButton.onClick.AddListener(OnLoadPreset);
+
+            if (applyRestartButton != null)
+                applyRestartButton.onClick.AddListener(OnApplyAndRestart);
+
+            if (playPauseButton != null)
+                playPauseButton.onClick.AddListener(OnTogglePlayPause);
+
+            if (stepButton != null)
+                stepButton.onClick.AddListener(OnStep);
+
+            if (restartButton != null)
+                restartButton.onClick.AddListener(OnRestart);
+
+            if (exportButton != null)
+                exportButton.onClick.AddListener(OnExport);
+
+            // Wire seed input
+            if (seedInput != null)
+            {
+                seedInput.onEndEdit.AddListener(OnSeedChanged);
+            }
 
             UpdatePlayPauseButton();
         }
@@ -90,17 +131,57 @@ namespace Viable.Core.Unity.UI
 
         private void PopulatePresetDropdown()
         {
-            if (presetDropdown == null) return;
-
-            // TODO: Load from PresetLibrary
-            presetDropdown.ClearOptions();
-            presetDropdown.AddOptions(new System.Collections.Generic.List<string>
+            if (presetDropdown == null)
             {
-                "Default",
-                "Circle Domain",
-                "Point Sources",
-                "Hysteresis Test"
-            });
+                Debug.LogWarning("[TopBarUI] presetDropdown is null");
+                return;
+            }
+
+            presetDropdown.ClearOptions();
+
+            var presetNames = new System.Collections.Generic.List<string>();
+
+#if UNITY_EDITOR
+            // Editor: Load from AssetDatabase
+            string[] guids = UnityEditor.AssetDatabase.FindAssets("t:ScenarioPreset", new[] { "Assets/Viable/Core.Unity/Presets/Examples" });
+            foreach (string guid in guids)
+            {
+                string path = UnityEditor.AssetDatabase.GUIDToAssetPath(guid);
+                var preset = UnityEditor.AssetDatabase.LoadAssetAtPath<ScenarioPreset>(path);
+                if (preset != null)
+                {
+                    presetNames.Add(preset.PresetName);
+                }
+            }
+#else
+            // Runtime: Load from Resources
+            var presets = Resources.LoadAll<ScenarioPreset>("Presets/Examples");
+            presetNames.AddRange(presets.Select(p => p.PresetName));
+
+            if (presetNames.Count == 0)
+            {
+                presets = Resources.LoadAll<ScenarioPreset>("Presets");
+                presetNames.AddRange(presets.Select(p => p.PresetName));
+            }
+#endif
+
+            // Fallback to dummy data if no presets found
+            if (presetNames.Count == 0)
+            {
+                Debug.LogWarning("[TopBarUI] No presets found, using fallback list");
+                presetNames.AddRange(new System.Collections.Generic.List<string>
+                {
+                    "Default",
+                    "No Presets Found"
+                });
+            }
+            else
+            {
+                presetNames.Sort();
+                Debug.Log($"[TopBarUI] Loaded {presetNames.Count} preset names");
+            }
+
+            presetDropdown.AddOptions(presetNames);
             presetDropdown.value = 0;
         }
 
@@ -181,7 +262,7 @@ namespace Viable.Core.Unity.UI
         void Update()
         {
             // Update seed display if it changed externally
-            if (seedInput != null && !seedInput.isFocused)
+            if (workingConfig != null && seedInput != null && !seedInput.isFocused)
             {
                 seedInput.text = workingConfig.Seed.ToString();
             }

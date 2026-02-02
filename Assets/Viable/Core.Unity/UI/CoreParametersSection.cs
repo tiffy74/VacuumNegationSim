@@ -1,6 +1,8 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using TMPro;
+using Viable.Core.Unity.Configuration;
+using Viable.Core.Unity.Controllers;
 
 namespace Viable.Core.Unity.UI
 {
@@ -22,6 +24,9 @@ namespace Viable.Core.Unity.UI
 
         [Header("Advanced Parameters Button")]
         [SerializeField] private Button advancedParamsButton;
+
+        [Header("Orchestrator")]
+        [SerializeField] private SimulationUIOrchestrator orchestrator;
 
         private Configuration.WorkingScenarioConfig currentConfig;
 
@@ -61,6 +66,40 @@ namespace Viable.Core.Unity.UI
             }
         }
 
+        /// <summary>
+        /// Refresh UI controls from WorkingScenarioConfig.
+        /// </summary>
+        public void Refresh(WorkingScenarioConfig cfg)
+        {
+            if (orchestrator != null && orchestrator.IsRefreshing())
+                return;
+
+            // Set input field values WITHOUT triggering OnEndEdit/OnValueChanged
+            // Adjust field names to match your actual fields:
+            if (resourceGlobalMaxInput != null)
+                resourceGlobalMaxInput.SetTextWithoutNotify(cfg.ResourceGlobalMax.ToString("G"));
+
+            if (resourceRechargeRateInput != null)
+                resourceRechargeRateInput.SetTextWithoutNotify(cfg.ResourceRechargeRate.ToString("G"));
+
+            if (decayLossInput != null)
+                decayLossInput.SetTextWithoutNotify(cfg.DecayLoss.ToString("G"));
+
+            if (maintCostInput != null)
+                maintCostInput.SetTextWithoutNotify(cfg.MaintCost.ToString("G"));
+
+            if (activationCostInput != null)
+                activationCostInput.SetTextWithoutNotify(cfg.ActivationCost.ToString("G"));
+
+            if (expansionProbabilityInput != null)
+                expansionProbabilityInput.SetTextWithoutNotify(cfg.ExpansionProbability.ToString("G"));
+
+            if (inflowPerCellInput != null)
+                inflowPerCellInput.SetTextWithoutNotify(cfg.InflowPerCell.ToString("G"));
+
+            if (diffusionRateInput != null)
+                diffusionRateInput.SetTextWithoutNotify(cfg.DiffusionRate.ToString("G"));
+        }
         public override void Bind(Configuration.WorkingScenarioConfig config)
         {
             currentConfig = config;

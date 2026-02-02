@@ -71,11 +71,81 @@ namespace Viable.Core.Unity.Configuration
         }
 
         /// <summary>
+        /// Create WorkingScenarioConfig from a ScenarioPreset (deep copy).
+        /// Maps all preset values to WorkingConfig fields.
+        /// </summary>
+        public static WorkingScenarioConfig FromPreset(ScenarioPreset preset)
+        {
+            if (preset == null)
+                throw new System.ArgumentNullException(nameof(preset));
+
+            var config = new WorkingScenarioConfig
+            {
+                ScenarioId = preset.PresetName ?? "Custom",
+                Seed = preset.Seed ?? 42,
+                GridWidth = preset.GridWidth,
+                GridHeight = preset.GridHeight,
+                PhaseSetId = "Standard"
+            };
+
+            // Map mechanism modes from preset's MechanismConfig
+            if (preset.MechanismConfig != null)
+            {
+                config.Topology = preset.MechanismConfig.TopologyMode;
+                config.Boundary = preset.MechanismConfig.BoundaryMode;
+                config.Inflow = preset.MechanismConfig.InflowMode;
+                config.Diffusion = preset.MechanismConfig.DiffusionMode;
+                config.ViabilityRule = preset.MechanismConfig.ViabilityRule;
+
+                // Topology details
+                config.MaskType = preset.MechanismConfig.MaskShape;
+                config.MaskRadiusOuter = preset.MechanismConfig.MaskRadiusOuter;
+                config.MaskRadiusInner = preset.MechanismConfig.MaskRadiusInner;
+                config.MaskCorridorWidth = preset.MechanismConfig.MaskCorridorWidth;
+                config.MaskPercolationProbability = preset.MechanismConfig.MaskPercolationProbability;
+
+                // Point sources (deep copy)
+                config.PointSources = new List<PointSourceData>();
+                foreach (var src in preset.MechanismConfig.PointSources)
+                {
+                    config.PointSources.Add(new PointSourceData(src.X, src.Y, src.Strength));
+                }
+
+                // Hysteresis
+                config.HysteresisOnThreshold = preset.MechanismConfig.HysteresisOnThreshold;
+                config.HysteresisOffThreshold = preset.MechanismConfig.HysteresisOffThreshold;
+
+                // Anisotropic diffusion
+                config.AnisotropicDirection = preset.MechanismConfig.AnisotropicDirection;
+                config.AnisotropicBias = preset.MechanismConfig.AnisotropicBias;
+            }
+
+            // Map core parameters using GetParameter method
+            config.ResourceGlobalMax = preset.GetParameter("resourceGlobalMax", 5e7);
+            config.ResourceRechargeRate = preset.GetParameter("globalReplenishPerTick", 200);
+            config.DecayLoss = preset.GetParameter("decayLoss", 0.003);
+            config.MaintCost = preset.GetParameter("ethreshBase", 0.18); // Using ethreshBase as maintCost proxy
+            config.ActivationCost = preset.GetParameter("activationCost", 0.25);
+            config.ExpansionProbability = preset.GetParameter("regionExpansionChance", 0.25);
+            config.InflowPerCell = preset.GetParameter("inflowPerCell", 1e4);
+            config.DiffusionRate = preset.GetParameter("complexityDiffusionRate", 0.2);
+
+            // Copy all parameters to advanced params
+            var paramDict = preset.GetParametersDictionary();
+            foreach (var kvp in paramDict)
+            {
+                config.AdvancedParams[kvp.Key] = kvp.Value;
+            }
+
+            return config;
+        }
+
+        /// <summary>
         /// Get mechanism summary for display.
         /// </summary>
         public string GetMechanismSummary()
         {
-            return $"Topology: {Topology} • Boundary: {Boundary} • Inflow: {Inflow} • Diffusion: {Diffusion} • Viability: {ViabilityRule}";
+            return $"Topology: {Topology} · Boundary: {Boundary} · Inflow: {Inflow} · Diffusion: {Diffusion} · Viability: {ViabilityRule}";
         }
     }
 

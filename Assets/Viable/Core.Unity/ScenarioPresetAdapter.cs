@@ -84,6 +84,95 @@ namespace Viable.Core.Unity
         }
 
         /// <summary>
+        /// Build a SimulationConfiguration from a ScenarioDefinition.
+        /// This is used when UI creates a scenario from WorkingConfig.
+        /// CRITICAL: Maps EngineConfig mechanism modes to SimulationConfiguration.
+        /// </summary>
+        public static SimulationConfiguration ToSimulationConfiguration(ScenarioDefinition scenario)
+        {
+            var config = new SimulationConfiguration();
+
+            // Map EngineConfig mechanism modes
+            if (scenario.EngineConfig != null)
+            {
+                config.InflowMode = scenario.EngineConfig.InflowMode;
+                config.BoundaryMode = scenario.EngineConfig.BoundaryMode;
+                config.DiffusionMode = scenario.EngineConfig.DiffusionMode;
+                config.ViabilityRule = scenario.EngineConfig.ViabilityRule;
+                config.TopologyMode = scenario.EngineConfig.TopologyMode;
+                config.MaskShape = scenario.EngineConfig.MaskShape;
+
+                config.HysteresisOnThreshold = scenario.EngineConfig.HysteresisOnThreshold;
+                config.HysteresisOffThreshold = scenario.EngineConfig.HysteresisOffThreshold;
+
+                config.MaskRadius = scenario.EngineConfig.MaskRadius;
+                config.MaskInnerRadius = scenario.EngineConfig.MaskInnerRadius;
+                config.CorridorWidth = scenario.EngineConfig.CorridorWidth;
+                config.HoleProbability = scenario.EngineConfig.HoleProbability;
+
+                // NOTE: Anisotropy parameters are in EngineConfig but not yet in SimulationConfiguration
+                // They will be added when anisotropic diffusion is fully implemented
+                // For now, anisotropic diffusion mode is stored but direction/bias ignored
+            }
+
+            // Map numeric parameters
+            if (scenario.Parameters != null)
+            {
+                config.ResourceGlobalMax = (float)GetParam(scenario.Parameters, "resourceGlobalMax", 5e7);
+                config.GlobalReplenishPerTick = (float)GetParam(scenario.Parameters, "globalReplenishPerTick", 200);
+                config.MinResourceForPersistence = (float)GetParam(scenario.Parameters, "minResourceForPersistence", 5);
+
+                config.EthreshBase = (float)GetParam(scenario.Parameters, "ethreshBase", 0.18);
+                config.GlobalScarcityK = (float)GetParam(scenario.Parameters, "globalScarcityK", 0.3);
+                config.ComplexityPenalty = (float)GetParam(scenario.Parameters, "complexityPenalty", 0.02);
+                config.DecayLoss = (float)GetParam(scenario.Parameters, "decayLoss", 0.003);
+
+                config.PropagateFrac = (float)GetParam(scenario.Parameters, "propagateFrac", 0.25);
+                config.MinBudgetToPropagate = (float)GetParam(scenario.Parameters, "minBudgetToPropagate", 0.1);
+                config.ActivationCost = (float)GetParam(scenario.Parameters, "activationCost", 0.25);
+
+                config.ComplexityGainPerUse = (float)GetParam(scenario.Parameters, "complexityGainPerUse", 0.2);
+                config.ComplexityDiffusionRate = (float)GetParam(scenario.Parameters, "complexityDiffusionRate", 0.2);
+                config.ComplexityDecay = (float)GetParam(scenario.Parameters, "complexityDecay", 0.02);
+
+                config.ResourceLocalMax = (float)GetParam(scenario.Parameters, "resourceLocalMax", 5e4);
+                config.PerturbationProbability = (float)GetParam(scenario.Parameters, "perturbationProbability", 0.0002);
+                config.PerturbationComplexity = (float)GetParam(scenario.Parameters, "perturbationComplexity", 0.5);
+                config.ExpansionRate = (float)GetParam(scenario.Parameters, "expansionRate", 1.0);
+                config.MatterAheadThreshold = (float)GetParam(scenario.Parameters, "matterAheadThreshold", 0);
+
+                config.SinkFormationThreshold = (float)GetParam(scenario.Parameters, "sinkFormationThreshold", 0.5);
+                config.SinkDrainFraction = (float)GetParam(scenario.Parameters, "sinkDrainFraction", 0);
+                config.SinkRecoilFraction = (float)GetParam(scenario.Parameters, "sinkRecoilFraction", 0);
+
+                config.RegionExpansionChance = (float)GetParam(scenario.Parameters, "regionExpansionChance", 0.25);
+                config.RegionExpansionCost = (float)GetParam(scenario.Parameters, "regionExpansionCost", 0.05);
+                config.RegionExpansionMinSource = (float)GetParam(scenario.Parameters, "regionExpansionMinSource", 0.1);
+                config.RegionExpansionRequiresViability = GetParam(scenario.Parameters, "regionExpansionRequiresViability", 0) > 0.5;
+                config.RegionExpansionSeedsResource = GetParam(scenario.Parameters, "regionExpansionSeedsResource", 1) > 0.5;
+                config.RegionSeedResource = (float)GetParam(scenario.Parameters, "regionSeedResource", 0.1);
+
+                config.ComplexityGainFromGradient = (float)GetParam(scenario.Parameters, "complexityGainFromGradient", 0.02);
+                config.ComplexityGainNearSink = (float)GetParam(scenario.Parameters, "complexityGainNearSink", 0.05);
+                config.ComplexityViabilityGainA = (float)GetParam(scenario.Parameters, "complexityViabilityGainA", 0.5);
+                config.ComplexityViabilityGainK = (float)GetParam(scenario.Parameters, "complexityViabilityGainK", 1.0);
+            }
+
+            config.ShowComplexityTint = false;
+            config.ViabilityColorScale = 40f;
+
+            return config;
+        }
+
+        /// <summary>
+        /// Helper to get parameter with default fallback.
+        /// </summary>
+        private static double GetParam(Dictionary<string, double> parameters, string key, double defaultValue)
+        {
+            return parameters != null && parameters.ContainsKey(key) ? parameters[key] : defaultValue;
+        }
+
+        /// <summary>
         /// Create a StepContext from preset configuration.
         /// </summary>
         public static StepContext CreateStepContext(ScenarioPreset preset, SimulationConfiguration config)
