@@ -195,9 +195,18 @@ namespace Viable.Core.Unity.Controllers
                 };
             }
 
-            // Spawn visual cells
-            views = new CellVisualiser[gridWidth, gridHeight];
-            Grid.SpawnVisualCells(views);
+            // Spawn visual cells (or reuse existing if same size)
+            if (views == null || views.GetLength(0) != gridWidth || views.GetLength(1) != gridHeight)
+            {
+                // Need to respawn - size changed or first time
+                views = new CellVisualiser[gridWidth, gridHeight];
+                Grid.SpawnVisualCells(views);
+                Debug.Log($"[SimulationController] Spawned {gridWidth}×{gridHeight} visual cells");
+            }
+            else
+            {
+                Debug.Log($"[SimulationController] Reusing existing {gridWidth}×{gridHeight} visual cells");
+            }
 
             // Create Engine state
             state = new GridState(gridWidth, gridHeight);
@@ -785,19 +794,27 @@ namespace Viable.Core.Unity.Controllers
                 return;
             }
 
-            scenarioPreset = preset;
             Debug.Log($"[SimulationController] Loading preset: {preset.PresetName}");
 
-            // Pause current simulation
+            // Stop current simulation
+            bool wasRunning = running;
             Pause();
-
-            // Stop existing coroutine if running
             StopAllCoroutines();
+
+            // Set new preset
+            scenarioPreset = preset;
 
             // Reinitialize with new preset
             InitializeSimulation();
 
-            Debug.Log($"[SimulationController] Preset loaded: {preset.PresetName}");
+            Debug.Log($"[SimulationController] ? Preset loaded: {preset.PresetName}");
+            
+            // Resume if was running before
+            if (wasRunning)
+            {
+                Debug.Log("[SimulationController] Resuming simulation with new preset");
+                Play();
+            }
         }
 
         /// <summary>
