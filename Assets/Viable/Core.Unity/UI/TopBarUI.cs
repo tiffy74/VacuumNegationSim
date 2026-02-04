@@ -166,6 +166,9 @@ namespace Viable.Core.Unity.UI
                 "100 steps/frame"
             });
             speedDropdown.value = 0;
+            
+            // Add listeners
+            speedDropdown.onValueChanged.RemoveAllListeners();
             speedDropdown.onValueChanged.AddListener(OnSpeedChanged);
         }
 
@@ -194,12 +197,16 @@ namespace Viable.Core.Unity.UI
                 }
             }
 #else
-            // Runtime: Load from Resources
+            // Runtime: Load from Resources folder
+            // Path is relative to any Resources folder: "Presets/Examples" finds "Assets/.../Resources/Presets/Examples"
             var presets = Resources.LoadAll<ScenarioPreset>("Presets/Examples");
+            Debug.Log($"[TopBarUI] Loaded {presets.Length} presets from Resources/Presets/Examples");
+            
             presetNames.AddRange(presets.Select(p => p.PresetName));
 
             if (presetNames.Count == 0)
             {
+                Debug.LogWarning("[TopBarUI] No presets found in Resources/Presets/Examples, trying Resources/Presets");
                 presets = Resources.LoadAll<ScenarioPreset>("Presets");
                 presetNames.AddRange(presets.Select(p => p.PresetName));
             }
@@ -257,6 +264,44 @@ namespace Viable.Core.Unity.UI
             presetDropdown.AddOptions(presetNames);
             presetDropdown.value = 0; // Select first item (Default)
             presetDropdown.RefreshShownValue(); // Force UI update
+            
+            // Add listener to close dropdown after selection
+            presetDropdown.onValueChanged.RemoveAllListeners();
+            presetDropdown.onValueChanged.AddListener(OnPresetDropdownChanged);
+        }
+        
+        /// <summary>
+        /// Called when preset dropdown value changes. Forces dropdown to close.
+        /// </summary>
+        private void OnPresetDropdownChanged(int index)
+        {
+            Debug.Log($"[TopBarUI] Preset dropdown changed to index {index}: {presetDropdown.options[index].text}");
+            
+            // Force close the dropdown immediately
+            // Use delayed close to ensure Unity processes the selection first
+            StartCoroutine(CloseDropdownDelayed(presetDropdown));
+        }
+        
+        /// <summary>
+        /// Closes dropdown after a very short delay to ensure selection is processed.
+        /// </summary>
+        private System.Collections.IEnumerator CloseDropdownDelayed(TMP_Dropdown dropdown)
+        {
+            // Wait one frame for Unity to process the selection
+            yield return null;
+            
+            // Force hide the dropdown
+            if (dropdown != null)
+            {
+                dropdown.Hide();
+                
+                // Also disable the blocker that keeps dropdown open
+                var template = dropdown.template;
+                if (template != null && template.gameObject.activeSelf)
+                {
+                    template.gameObject.SetActive(false);
+                }
+            }
         }
 
         private void OnLoadPreset()
@@ -300,8 +345,14 @@ namespace Viable.Core.Unity.UI
 
             if (selectedPreset == null)
             {
+                Debug.LogWarning($"[TopBarUI] Preset '{presetName}' not found in Presets/Examples, trying Presets");
                 presets = Resources.LoadAll<ScenarioPreset>("Presets");
                 selectedPreset = System.Array.Find(presets, p => p.PresetName == presetName);
+            }
+            
+            if (selectedPreset == null)
+            {
+                Debug.LogError($"[TopBarUI] Could not find preset '{presetName}' in any Resources folder");
             }
 #endif
 
@@ -392,9 +443,11 @@ namespace Viable.Core.Unity.UI
             int[] speeds = { 1, 5, 10, 50, 100 };
             if (index >= 0 && index < speeds.Length)
             {
-                // TODO: Set simulation speed
                 Debug.Log($"[TopBarUI] Speed changed to {speeds[index]} steps/frame");
             }
+            
+            // Force close the dropdown with delay
+            StartCoroutine(CloseDropdownDelayed(speedDropdown));
         }
 
         private void UpdatePlayPauseButton()

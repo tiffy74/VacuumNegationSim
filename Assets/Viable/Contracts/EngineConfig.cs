@@ -52,12 +52,15 @@ namespace Viable.Contracts
         public RegionMode RegionMode { get; set; } = RegionMode.CurrentDefault;
 
         /// <summary>
-        /// Grid topology type. Default: RectGrid (current behavior).
+        /// Grid topology type - the 3 fundamental regular tessellations.
+        /// Default: RectGrid (current behavior, 4 neighbors).
+        /// Stage 13.7-13.8: Triangular (6) and Hexagonal (6) tessellations.
         /// </summary>
         public TopologyMode TopologyMode { get; set; } = TopologyMode.RectGrid;
 
         /// <summary>
         /// Mask shape when TopologyMode = MaskedDomain. Default: Rectangle (no mask).
+        /// Stage 13.9: Future feature for constrained geometries.
         /// </summary>
         public MaskShape MaskShape { get; set; } = MaskShape.Rectangle;
 

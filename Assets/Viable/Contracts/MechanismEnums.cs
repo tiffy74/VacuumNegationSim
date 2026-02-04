@@ -158,30 +158,40 @@ namespace Viable.Contracts
     }
 
     /// <summary>
-    /// Selects the grid topology type.
-    /// Stage 13: Behavioral configuration.
+    /// Selects the grid topology type - the 3 fundamental regular tessellations.
+    /// Stage 13: Basic shape groups for comprehensive spatial behavior comparison.
     /// </summary>
     public enum TopologyMode
     {
         /// <summary>
-        /// Current default: rectangular grid.
+        /// Rectangular (square) grid - 4 neighbors, Manhattan distance.
+        /// Current default: implemented and well-tested.
         /// </summary>
         RectGrid = 0,
 
         /// <summary>
-        /// Masked domain with specified shape.
+        /// Triangular grid - 3 or 6 neighbors depending on connectivity.
+        /// Stage 13.7: Fundamental triangular tessellation.
         /// </summary>
-        MaskedDomain = 1,
+        TriGrid = 1,
 
         /// <summary>
-        /// Hexagonal grid (future extension).
+        /// Hexagonal grid - 6 neighbors, uniform distance, isotropic diffusion.
+        /// Stage 13.8: Most symmetric regular tessellation.
         /// </summary>
         HexGrid = 2,
 
         /// <summary>
-        /// Graph-based domain (future extension).
+        /// Future: Masked domain with shaped constraints (circular, corridor, etc.)
+        /// Stage 13.9: Constrained geometries within rectangular grid.
         /// </summary>
-        GraphDomain = 3
+        MaskedDomain = 3,
+
+        /// <summary>
+        /// Future: Graph-based domain for non-spatial networks.
+        /// Stage 14: Arbitrary connectivity graphs.
+        /// </summary>
+        GraphDomain = 4
     }
 
     /// <summary>
