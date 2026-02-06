@@ -2,27 +2,30 @@ using System;
 using Viable.Engine.State;
 using Viable.Engine.Execution;
 using Viable.Engine.Logic;
+using Viable.Contracts;
 
 namespace Viable.Engine.Steps
 {
     /// <summary>
     /// Phase 1: Gather outflow from active cells and distribute to neighbors.
     /// Handles sink formation at boundaries via charge accumulation.
+    /// Updated for multi-topology support (Triangle/Rectangle/Hexagon).
     /// </summary>
     public static class OutflowPhase
     {
-        static bool IsBoundaryInactive(int idx, int width, int height, bool[] activeRegion)
+        static bool IsBoundaryInactive(int idx, int width, int height, bool[] activeRegion, TopologyMode topology, AdjacencyMode adjacency)
         {
             int x = idx % width;
             int y = idx / width;
-            int[] dx = { 0, 0, -1, 1 };
-            int[] dy = { -1, 1, 0, 0 };
+            
+            // Use NeighborProvider for correct neighbor offsets
+            NeighborProvider.GetNeighborOffsets(x, y, topology, out int[] dx, out int[] dy, adjacency);
 
             bool hasActiveNeighbor = false;
-            for (int d = 0; d < 4; d++)
+            for (int i = 0; i < dx.Length; i++)
             {
-                int nx = x + dx[d];
-                int ny = y + dy[d];
+                int nx = x + dx[i];
+                int ny = y + dy[i];
                 if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
                 int nIdx = ny * width + nx;
                 if (activeRegion[nIdx]) { hasActiveNeighbor = true; break; }
@@ -38,6 +41,7 @@ namespace Viable.Engine.Steps
             int[] RegionActivationTick, int[] ResourceFirstTick,
             int[] SinkId, int[] SinkParent, float[] SinkMass, ref int NextSinkId,
             int tick, out int boundaryHitsThisTick, out float maxChargeThisTick,
+            TopologyMode topology, AdjacencyMode adjacency,  // NEW: topology parameters
             bool debugForceSinkOnFirstBoundaryHit = false)
         {
             Array.Clear(incoming, 0, incoming.Length);
@@ -46,8 +50,6 @@ namespace Viable.Engine.Steps
             maxChargeThisTick = 0f;
 
             int Idx(int x, int y) => y * width + x;
-            int[] dx = { 0, 0, -1, 1 };
-            int[] dy = { -1, 1, 0, 0 };
 
             // FIRST: Calculate sink attraction weights for each cell based on merged sink mass
             float[] sinkAttractionWeight = new float[width * height];
@@ -58,10 +60,13 @@ namespace Viable.Engine.Steps
                     int pi = Idx(px, py);
                     if (!ActiveRegion[pi]) continue;
                     
+                    // Get neighbors using NeighborProvider
+                    NeighborProvider.GetNeighborOffsets(px, py, topology, out int[] dx, out int[] dy, adjacency);
+                    
                     // Sum the influence of ALL adjacent sinks (by their root mass)
                     float totalSinkInfluence = 0f;
                     
-                    for (int d = 0; d < 4; d++)
+                    for (int d = 0; d < dx.Length; d++)
                     {
                         int nx = px + dx[d];
                         int ny = py + dy[d];
@@ -106,18 +111,22 @@ namespace Viable.Engine.Steps
                     float available = ResourceLocal[i] * frac;
                     if (available <= 0f) continue;
 
+                    // Get neighbors using NeighborProvider
+                    NeighborProvider.GetNeighborOffsets(x, y, topology, out int[] nbDx, out int[] nbDy, adjacency);
+                    int neighborCount = nbDx.Length;
+
                     // Calculate weighted distribution based on sink attraction
-                    float[] weights = new float[4];
-                    int[] neighborIndices = new int[4];
-                    bool[] isBoundaryInactive = new bool[4];
-                    bool[] isSinkNeighbor = new bool[4];
+                    float[] weights = new float[neighborCount];
+                    int[] neighborIndices = new int[neighborCount];
+                    bool[] isBoundaryInactive = new bool[neighborCount];
+                    bool[] isSinkNeighbor = new bool[neighborCount];
                     float totalWeight = 0f;
                     int validNeighbors = 0;
 
-                    for (int d = 0; d < 4; d++)
+                    for (int d = 0; d < neighborCount; d++)
                     {
-                        int nx = x + dx[d];
-                        int ny = y + dy[d];
+                        int nx = x + nbDx[d];
+                        int ny = y + nbDy[d];
                         if (nx < 0 || nx >= width || ny < 0 || ny >= height)
                         {
                             weights[d] = 0f;
@@ -158,7 +167,7 @@ namespace Viable.Engine.Steps
                             isSinkNeighbor[d] = false;
                         }
                         // Boundary inactive: potential sink formation site
-                        else if (IsBoundaryInactive(neighborIdx, width, height, ActiveRegion))
+                        else if (IsBoundaryInactive(neighborIdx, width, height, ActiveRegion, topology, adjacency))
                         {
                             weights[d] = 0f;
                             isBoundaryInactive[d] = true;
@@ -178,13 +187,13 @@ namespace Viable.Engine.Steps
                     // PART 1: Distribute to active neighbors (with mass-weighted sink attraction)
                     if (validNeighbors > 0)
                     {
-                        for (int d = 0; d < 4; d++)
+                        for (int di = 0; di < neighborCount; di++)
                         {
-                            if (weights[d] <= 0f) continue;
+                            if (weights[di] <= 0f) continue;
 
                             // Proportional distribution based on mass-weighted sink attraction
-                            float portion = available * (weights[d] / totalWeight);
-                            int neighborIdx = neighborIndices[d];
+                            float portion = available * (weights[di] / totalWeight);
+                            int neighborIdx = neighborIndices[di];
 
                             incoming[neighborIdx] += portion;
                             sentTotal += portion;
@@ -192,15 +201,15 @@ namespace Viable.Engine.Steps
                     }
 
                     // PART 2: Handle boundary inactive leakage (creates sinks after tick 10)
-                    for (int d = 0; d < 4; d++)
+                    float leakPerNeighbor = available / neighborCount; // Equal split across all possible neighbors
+                    for (int di = 0; di < neighborCount; di++)
                     {
-                        if (!isBoundaryInactive[d]) continue;
+                        if (!isBoundaryInactive[di]) continue;
 
-                        int neighborIdx = neighborIndices[d];
+                        int neighborIdx = neighborIndices[di];
 
                         // Resource leaking to boundary inactive charges sink formation
-                        float leakPortion = available * 0.25f;
-                        SinkCharge[neighborIdx] += leakPortion;
+                        SinkCharge[neighborIdx] += leakPerNeighbor;
                         boundaryHitsThisTick++;
 
                         maxChargeThisTick = Math.Max(maxChargeThisTick, SinkCharge[neighborIdx]);
@@ -232,15 +241,15 @@ namespace Viable.Engine.Steps
                         }
 
                         // No actual transfer; resource stays at source
-                        wouldHaveSentIntoNonActive += leakPortion;
+                        wouldHaveSentIntoNonActive += leakPerNeighbor;
                     }
 
                     // PART 3: Handle blocked sink neighbors (resource reflects back)
-                    for (int d = 0; d < 4; d++)
+                    for (int di = 0; di < neighborCount; di++)
                     {
-                        if (!isSinkNeighbor[d]) continue;
+                        if (!isSinkNeighbor[di]) continue;
 
-                        float blockedPortion = available * 0.25f;
+                        float blockedPortion = available / neighborCount;
                         wouldHaveSentIntoNonActive += blockedPortion;
                     }
 

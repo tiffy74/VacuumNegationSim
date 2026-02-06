@@ -69,40 +69,101 @@ namespace Viable.Core.Unity.Controllers
             }
             else
             {
-                Debug.LogWarning("[SimulationUIOrchestrator] No default preset set - using empty config");
-                WorkingConfig = new WorkingScenarioConfig();
+                Debug.LogWarning("[SimulationUIOrchestrator] No default preset set - attempting to auto-load first preset");
+                // Try to auto-load the first preset from PresetControlsSection
+                AutoLoadFirstPreset();
             }
+        }
+        
+        /// <summary>
+        /// Auto-load the first preset if no default is set.
+        /// </summary>
+        private void AutoLoadFirstPreset()
+        {
+#if UNITY_EDITOR
+            // Editor: Load from AssetDatabase
+            string[] guids = UnityEditor.AssetDatabase.FindAssets("t:ScenarioPreset", new[] { "Assets/Viable/Core.Unity/Presets/Examples" });
+            if (guids.Length > 0)
+            {
+                // Find "Default" or "00_" preset
+                ScenarioPreset firstPreset = null;
+                foreach (string guid in guids)
+                {
+                    string path = UnityEditor.AssetDatabase.GUIDToAssetPath(guid);
+                    var preset = UnityEditor.AssetDatabase.LoadAssetAtPath<ScenarioPreset>(path);
+                    if (preset != null && (preset.PresetName.Contains("Default") || preset.PresetName.StartsWith("00_")))
+                    {
+                        firstPreset = preset;
+                        break;
+                    }
+                }
+                
+                // Fallback to first preset
+                if (firstPreset == null && guids.Length > 0)
+                {
+                    string path = UnityEditor.AssetDatabase.GUIDToAssetPath(guids[0]);
+                    firstPreset = UnityEditor.AssetDatabase.LoadAssetAtPath<ScenarioPreset>(path);
+                }
+                
+                if (firstPreset != null)
+                {
+                    Debug.Log($"[SimulationUIOrchestrator] Auto-loaded first preset: {firstPreset.PresetName}");
+                    LoadPreset(firstPreset);
+                    return;
+                }
+            }
+#else
+            // Runtime: Load from Resources
+            var presets = Resources.LoadAll<ScenarioPreset>("Presets/Examples");
+            if (presets.Length > 0)
+            {
+                // Find "Default" preset
+                var defaultPreset = System.Array.Find(presets, p => 
+                    p.PresetName.Contains("Default") || p.PresetName.StartsWith("00_"));
+                
+                if (defaultPreset != null)
+                {
+                    Debug.Log($"[SimulationUIOrchestrator] Auto-loaded default preset: {defaultPreset.PresetName}");
+                    LoadPreset(defaultPreset);
+                    return;
+                }
+                
+                // Fallback to first preset
+                Debug.Log($"[SimulationUIOrchestrator] Auto-loaded first preset: {presets[0].PresetName}");
+                LoadPreset(presets[0]);
+                return;
+            }
+#endif
+            
+            // No presets found - create empty config
+            Debug.LogWarning("[SimulationUIOrchestrator] No presets found - using empty config");
+            WorkingConfig = new WorkingScenarioConfig();
         }
 
         void Start()
         {
-            // Give PresetSelectorUI a frame to initialize
+            // Give PresetControlsSection a frame to initialize
             StartCoroutine(SyncPresetDropdownAfterInit());
         }
 
         private System.Collections.IEnumerator SyncPresetDropdownAfterInit()
         {
-            // Wait one frame to ensure PresetSelectorUI.Start() has run
+            // Wait one frame to ensure PresetControlsSection.Start() has run
             yield return null;
             
             // Ensure preset dropdown shows the current preset
-            if (topBarUI != null && CurrentPreset != null)
+            if (CurrentPreset != null)
             {
-                var presetSelector = topBarUI.GetComponent<PresetSelectorUI>();
-                if (presetSelector == null)
-                {
-                    // Try finding it anywhere in scene
-                    presetSelector = FindFirstObjectByType<PresetSelectorUI>();
-                }
+                var presetControls = FindFirstObjectByType<PresetControlsSection>();
                 
-                if (presetSelector != null)
+                if (presetControls != null)
                 {
-                    presetSelector.SelectPreset(CurrentPreset);
+                    presetControls.SelectPreset(CurrentPreset);
                     Debug.Log($"[SimulationUIOrchestrator] Synced dropdown to default preset: {CurrentPreset.PresetName}");
                 }
                 else
                 {
-                    Debug.LogWarning("[SimulationUIOrchestrator] PresetSelectorUI not found - dropdown won't sync");
+                    Debug.LogWarning("[SimulationUIOrchestrator] PresetControlsSection not found - dropdown won't sync");
                 }
             }
         }
@@ -147,6 +208,7 @@ namespace Viable.Core.Unity.Controllers
             
             // Log for diagnostics
             Debug.Log($"[SimulationUIOrchestrator] Apply & Restart: " +
+                     $"GridTopology={scenario.EngineConfig.TopologyMode}, " +
                      $"InflowMode={scenario.EngineConfig.InflowMode}, " +
                      $"BoundaryMode={scenario.EngineConfig.BoundaryMode}, " +
                      $"DiffusionMode={scenario.EngineConfig.DiffusionMode}, " +
@@ -220,12 +282,19 @@ namespace Viable.Core.Unity.Controllers
         {
             var engineConfig = new EngineConfig
             {
+                // Grid topology (cell shape) - NEW: Add this field
+                TopologyMode = WorkingConfig.GridTopology, // NEW: Directly map from GridTopology (Contracts.TopologyMode)
+                
                 // Mechanism modes - convert from WorkingConfig enums to Contracts enums
                 InflowMode = MapInflowMode(WorkingConfig.Inflow),
                 BoundaryMode = MapBoundaryMode(WorkingConfig.Boundary),
                 DiffusionMode = MapDiffusionMode(WorkingConfig.Diffusion),
                 ViabilityRule = MapViabilityRule(WorkingConfig.ViabilityRule),
-                TopologyMode = MapTopologyMode(WorkingConfig.Topology),
+
+                // Mask shape - determined by Domain mode
+                MaskShape = WorkingConfig.Domain == Configuration.DomainMode.MaskedDomain 
+                    ? MapMaskShape(WorkingConfig.MaskType) 
+                    : Contracts.MaskShape.Rectangle, // FullDomain = no mask
 
                 // Point sources (deep copy)
                 PointSources = WorkingConfig.PointSources.Select(ps => new PointSourceConfig
@@ -245,7 +314,6 @@ namespace Viable.Core.Unity.Controllers
                 AnisotropyBias = WorkingConfig.AnisotropicBias,
 
                 // Mask parameters
-                MaskShape = MapMaskShape(WorkingConfig.MaskType),
                 MaskRadius = WorkingConfig.MaskRadiusOuter,
                 MaskInnerRadius = WorkingConfig.MaskRadiusInner,
                 CorridorWidth = WorkingConfig.MaskCorridorWidth,
@@ -356,14 +424,14 @@ namespace Viable.Core.Unity.Controllers
             }
         }
 
-        private Contracts.TopologyMode MapTopologyMode(Configuration.TopologyMode mode)
+        private Contracts.TopologyMode MapTopologyMode(Configuration.DomainMode mode) // RENAMED: TopologyMode ? DomainMode
         {
             switch (mode)
             {
-                case Configuration.TopologyMode.FullDomain:
-                    return Contracts.TopologyMode.RectGrid;
-                case Configuration.TopologyMode.MaskedDomain:
-                    return Contracts.TopologyMode.MaskedDomain;
+                case Configuration.DomainMode.FullDomain:
+                    return Contracts.TopologyMode.RectGrid; // FullDomain = rectangular grid, no mask
+                case Configuration.DomainMode.MaskedDomain:
+                    return Contracts.TopologyMode.MaskedDomain; // MaskedDomain = constrained geometry
                 default:
                     return Contracts.TopologyMode.RectGrid;
             }

@@ -116,8 +116,8 @@ namespace Viable.Core.Unity.UI
 
         public override void RefreshVisibility(Configuration.WorkingScenarioConfig config)
         {
-            // Show only when Topology = MaskedDomain
-            bool relevant = (config.Topology == Configuration.TopologyMode.MaskedDomain);
+            // Show only when Domain = MaskedDomain (renamed from Topology)
+            bool relevant = (config.Domain == Configuration.DomainMode.MaskedDomain);
             gameObject.SetActive(relevant);
         }
 

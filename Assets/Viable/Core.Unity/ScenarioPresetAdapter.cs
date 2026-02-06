@@ -16,7 +16,7 @@ namespace Viable.Core.Unity
         /// </summary>
         public static ScenarioDefinition ToScenarioDefinition(ScenarioPreset preset)
         {
-            return new ScenarioDefinition
+            var scenario = new ScenarioDefinition
             {
                 ScenarioId = preset.PresetId,
                 ScenarioName = preset.PresetName,
@@ -26,6 +26,115 @@ namespace Viable.Core.Unity
                 Seed = preset.Seed,
                 Parameters = preset.GetParametersDictionary()
             };
+
+            // NEW: Map EngineConfig including GridTopology
+            if (preset.MechanismConfig != null)
+            {
+                scenario.EngineConfig = new EngineConfig
+                {
+                    TopologyMode = preset.MechanismConfig.GridTopology, // NEW: Cell shape (Rect/Tri/Hex)
+                    InflowMode = MapInflowMode(preset.MechanismConfig.InflowMode),
+                    BoundaryMode = MapBoundaryMode(preset.MechanismConfig.BoundaryMode),
+                    DiffusionMode = MapDiffusionMode(preset.MechanismConfig.DiffusionMode),
+                    ViabilityRule = MapViabilityRule(preset.MechanismConfig.ViabilityRule),
+                    
+                    // Domain masking configuration
+                    MaskShape = MapMaskShape(preset.MechanismConfig.DomainMode, preset.MechanismConfig.MaskShape),
+                    MaskRadius = preset.MechanismConfig.MaskRadiusOuter,
+                    MaskInnerRadius = preset.MechanismConfig.MaskRadiusInner,
+                    CorridorWidth = preset.MechanismConfig.MaskCorridorWidth,
+                    HoleProbability = preset.MechanismConfig.MaskPercolationProbability,
+                    
+                    // Point sources
+                    PointSources = MapPointSources(preset.MechanismConfig.PointSources),
+                    
+                    // Hysteresis
+                    HysteresisOnThreshold = preset.MechanismConfig.HysteresisOnThreshold,
+                    HysteresisOffThreshold = preset.MechanismConfig.HysteresisOffThreshold
+                };
+            }
+
+            return scenario;
+        }
+
+        // Helper methods to map Unity enums to Contracts enums
+        private static InflowMode MapInflowMode(Configuration.InflowMode mode)
+        {
+            return mode switch
+            {
+                Configuration.InflowMode.UniformField => InflowMode.Uniform,
+                Configuration.InflowMode.PointSources => InflowMode.PointSources,
+                Configuration.InflowMode.EdgeSources => InflowMode.Uniform, // Map to Uniform for now
+                _ => InflowMode.Uniform
+            };
+        }
+
+        private static BoundaryMode MapBoundaryMode(Configuration.BoundaryMode mode)
+        {
+            return mode switch
+            {
+                Configuration.BoundaryMode.Closed => BoundaryMode.Reflecting,
+                Configuration.BoundaryMode.Open => BoundaryMode.Absorbing,
+                Configuration.BoundaryMode.Wrap => BoundaryMode.PeriodicWrap,
+                _ => BoundaryMode.Absorbing
+            };
+        }
+
+        private static DiffusionMode MapDiffusionMode(Configuration.DiffusionMode mode)
+        {
+            return mode switch
+            {
+                Configuration.DiffusionMode.VonNeumann4 => DiffusionMode.VonNeumann4,
+                Configuration.DiffusionMode.Moore8 => DiffusionMode.Moore8,
+                Configuration.DiffusionMode.Anisotropic => DiffusionMode.Anisotropic,
+                _ => DiffusionMode.VonNeumann4
+            };
+        }
+
+        private static ViabilityRule MapViabilityRule(Configuration.ViabilityRuleMode mode)
+        {
+            return mode switch
+            {
+                Configuration.ViabilityRuleMode.Simple => ViabilityRule.HardThreshold,
+                Configuration.ViabilityRuleMode.Hysteresis => ViabilityRule.Hysteresis,
+                _ => ViabilityRule.HardThreshold
+            };
+        }
+
+        private static MaskShape MapMaskShape(Configuration.DomainMode domain, Configuration.MaskShape shape)
+        {
+            // If FullDomain, return Rectangle (no masking)
+            if (domain == Configuration.DomainMode.FullDomain)
+                return MaskShape.Rectangle;
+
+            // Otherwise map the shape
+            return shape switch
+            {
+                Configuration.MaskShape.Rectangle => MaskShape.Rectangle,
+                Configuration.MaskShape.Circle => MaskShape.Circle,
+                Configuration.MaskShape.Ring => MaskShape.Ring,
+                Configuration.MaskShape.Corridor => MaskShape.Corridor,
+                Configuration.MaskShape.PercolationHoles => MaskShape.PercolationHoles,
+                _ => MaskShape.Rectangle
+            };
+        }
+
+        private static List<PointSourceConfig> MapPointSources(List<Configuration.PointSourceData> sources)
+        {
+            var result = new List<PointSourceConfig>();
+            if (sources != null)
+            {
+                foreach (var src in sources)
+                {
+                    result.Add(new PointSourceConfig
+                    {
+                        X = src.X,
+                        Y = src.Y,
+                        Strength = src.Strength
+                    });
+                }
+            }
+            return result;
         }
 
         /// <summary>

@@ -14,6 +14,7 @@ namespace Viable.Engine.Steps
         /// Diffuses complexity metric across the grid using a simple Laplacian, then applies decay and clamps.
         /// Stage 13.5: Supports BoundaryMode for periodic wrap.
         /// Stage 13.6: Supports DiffusionMode for different neighborhood sizes.
+        /// Stage 13.7: Supports TopologyMode for proper neighbor connectivity (4 vs 6 neighbors).
         /// Stage 13.8: Supports domain masks for constrained propagation.
         /// </summary>
         /// <param name="width">Grid width</param>
@@ -26,6 +27,7 @@ namespace Viable.Engine.Steps
         /// <param name="boundaryMode">Boundary condition mode (default: Absorbing)</param>
         /// <param name="diffusionMode">Diffusion neighborhood mode (default: VonNeumann4)</param>
         /// <param name="domainMask">Optional domain mask (Stage 13.8)</param>
+        /// <param name="topology">Grid topology mode (Stage 13.7 - default: RectGrid)</param>
         public static void ComplexityDiffuse(
             int width, int height,
             float[] ComplexityMetric, float[] complexityNext,
@@ -33,7 +35,8 @@ namespace Viable.Engine.Steps
             bool[] IsSink,
             BoundaryMode boundaryMode = BoundaryMode.Absorbing,
             DiffusionMode diffusionMode = DiffusionMode.VonNeumann4,
-            bool[] domainMask = null)  // Stage 13.8
+            bool[] domainMask = null,
+            TopologyMode topology = TopologyMode.RectGrid)  // ADDED: topology parameter
         {
             int Idx(int x, int y) => y * width + x;
 
@@ -58,11 +61,10 @@ namespace Viable.Engine.Steps
 
                     float c = ComplexityMetric[i];
 
-                    // Stage 13.6: Get neighbors based on diffusion mode
-                    // Stage 13.8: Pass domain mask
+                    // Stage 13.6/13.7: Get neighbors based on diffusion mode and topology
                     int[] nx, ny;
                     int neighborCount;
-                    TopologyProvider.GetNeighbors(x, y, width, height, diffusionMode, boundaryMode, out nx, out ny, out neighborCount, domainMask);
+                    TopologyProvider.GetNeighbors(x, y, width, height, diffusionMode, boundaryMode, out nx, out ny, out neighborCount, domainMask, topology);
 
                     // Compute Laplacian: sum(neighbors) - N*center
                     float neighborSum = 0f;

@@ -6,6 +6,7 @@ namespace Viable.Engine.Configuration
     /// Simulation configuration parameters (Unity-free).
     /// Color values moved to separate ColorConfiguration for Unity layer.
     /// Stage 13: Added mechanism selectors with safe defaults.
+    /// Stage 13.9: Added adjacency mode for neighbor connectivity.
     /// </summary>
     public sealed class SimulationConfiguration
     {
@@ -62,6 +63,14 @@ namespace Viable.Engine.Configuration
         /// Topology mode. Default: RectGrid (current behavior).
         /// </summary>
         public Contracts.TopologyMode TopologyMode = Contracts.TopologyMode.RectGrid;
+
+        /// <summary>
+        /// Adjacency mode for neighbor connectivity.
+        /// Stage 13.9: Choose between edge-only or edge+vertex neighbors.
+        /// Default: EdgeOnly (true topology connectivity: Triangle=3, Rect=4, Hex=6)
+        /// EdgeAndVertex: Extended connectivity (Triangle=6, Rect=8, Hex=6)
+        /// </summary>
+        public Contracts.AdjacencyMode AdjacencyMode = Contracts.AdjacencyMode.EdgeOnly;
 
         /// <summary>
         /// Mask shape. Default: Rectangle (no mask, current behavior).

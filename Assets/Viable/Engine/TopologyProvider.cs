@@ -8,21 +8,31 @@ namespace Viable.Engine
     /// Topology provider for grid-based simulations.
     /// Stage 13.5: Enables different boundary conditions (absorbing, periodic, etc.)
     /// Stage 13.6: Supports different neighborhood types (VonNeumann4, Moore8)
+    /// Stage 13.7: Supports grid topology (Rectangular, Triangular, Hexagonal) for proper neighbor connectivity.
     /// </summary>
     public static class TopologyProvider
     {
         /// <summary>
-        /// Get neighbors based on diffusion mode and boundary handling.
-        /// Stage 13.6: Supports both 4-neighbor and 8-neighbor topologies.
-        /// Stage 13.8: Optionally respects domain mask.
+        /// Get neighbors based on grid topology, diffusion mode, and boundary handling.
+        /// Stage 13.7: Now topology-aware - uses 4 neighbors for Rectangular, 6 for Triangular/Hexagonal.
         /// </summary>
         public static void GetNeighbors(
             int x, int y, int width, int height,
             DiffusionMode diffusionMode,
             BoundaryMode boundaryMode,
             out int[] nx, out int[] ny, out int count,
-            bool[] domainMask = null)  // Stage 13.8
+            bool[] domainMask = null,
+            TopologyMode topology = TopologyMode.RectGrid)  // ADDED: Grid topology parameter
         {
+            // Stage 13.7: If topology is Triangular or Hexagonal, override diffusion mode
+            // These grids always have 6 neighbors regardless of diffusion mode
+            if (topology == TopologyMode.TriGrid || topology == TopologyMode.HexGrid)
+            {
+                GetNeighborsTopology(x, y, width, height, topology, boundaryMode, out nx, out ny, out count, domainMask);
+                return;
+            }
+
+            // Original behavior for Rectangular grid
             switch (diffusionMode)
             {
                 case DiffusionMode.VonNeumann4:
@@ -37,6 +47,68 @@ namespace Viable.Engine
                     // Default to VonNeumann4 (current behavior)
                     GetNeighbors4(x, y, width, height, boundaryMode, out nx, out ny, out count, domainMask);
                     break;
+            }
+        }
+
+        /// <summary>
+        /// Get neighbors based on grid topology (Triangular or Hexagonal).
+        /// Stage 13.7: Handles offset coordinates for triangular and hexagonal grids.
+        /// </summary>
+        private static void GetNeighborsTopology(
+            int x, int y, int width, int height,
+            TopologyMode topology,
+            BoundaryMode boundaryMode,
+            out int[] nx, out int[] ny, out int count,
+            bool[] domainMask = null)
+        {
+            // Allocate arrays for up to 6 neighbors (triangular/hexagonal)
+            nx = new int[6];
+            ny = new int[6];
+            count = 0;
+
+            // Get topology-specific offsets
+            int[] dx, dy;
+            NeighborProvider.GetNeighborOffsets(x, y, topology, out dx, out dy, AdjacencyMode.EdgeOnly); // ADDED: adjacency parameter
+
+            for (int d = 0; d < dx.Length; d++)
+            {
+                int candidateX = x + dx[d];
+                int candidateY = y + dy[d];
+
+                // Apply boundary conditions
+                switch (boundaryMode)
+                {
+                    case BoundaryMode.Absorbing:
+                        if (candidateX < 0 || candidateX >= width || candidateY < 0 || candidateY >= height)
+                            continue;
+                        break;
+
+                    case BoundaryMode.PeriodicWrap:
+                        candidateX = (candidateX + width) % width;
+                        candidateY = (candidateY + height) % height;
+                        break;
+
+                    case BoundaryMode.Reflecting:
+                        if (candidateX < 0 || candidateX >= width || candidateY < 0 || candidateY >= height)
+                            continue;
+                        break;
+
+                    default:
+                        if (candidateX < 0 || candidateX >= width || candidateY < 0 || candidateY >= height)
+                            continue;
+                        break;
+                }
+
+                // Check domain mask
+                if (domainMask != null)
+                {
+                    if (!MaskGenerator.IsCellValid(candidateX, candidateY, width, domainMask))
+                        continue;
+                }
+
+                nx[count] = candidateX;
+                ny[count] = candidateY;
+                count++;
             }
         }
 

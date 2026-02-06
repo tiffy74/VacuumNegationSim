@@ -1,6 +1,25 @@
 namespace Viable.Contracts
 {
     /// <summary>
+    /// Adjacency mode for neighbor connectivity.
+    /// Stage 13.9: Determines how neighbors are defined (edge-only vs edge+vertex).
+    /// </summary>
+    public enum AdjacencyMode
+    {
+        /// <summary>
+        /// Only neighbors sharing an edge (true topology connectivity).
+        /// Triangle: 3, Rectangle: 4, Hexagon: 6
+        /// </summary>
+        EdgeOnly = 0,
+
+        /// <summary>
+        /// Neighbors sharing an edge OR vertex (extended connectivity).
+        /// Triangle: 6, Rectangle: 8, Hexagon: 6
+        /// </summary>
+        EdgeAndVertex = 1
+    }
+
+    /// <summary>
     /// Selects the inflow mechanism for resource delivery to the grid.
     /// Stage 13: Behavioral configuration.
     /// </summary>

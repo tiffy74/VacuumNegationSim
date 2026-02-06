@@ -7,6 +7,7 @@ using Viable.Engine.Execution;
 using Viable.Engine.Steps;
 using Viable.Engine.Logic;
 using Viable.Engine.Computation;
+// Stage 13.7: NeighborProvider is now in Viable.Engine namespace
 
 namespace Viable.Engine
 {
@@ -14,6 +15,7 @@ namespace Viable.Engine
     /// Standard simulation stepper that orchestrates all step phases.
     /// This is the Engine equivalent of LegacyTickStep.
     /// Stage 13.4: Supports optional point sources for localized inflow.
+    /// Stage 13.7: Supports topology-aware neighbor connectivity.
     /// </summary>
     public sealed class SimulationStepper : IStepPhase
     {
@@ -79,7 +81,7 @@ namespace Viable.Engine
             );
 
             // Sink expansion (simple geometric growth)
-            ExpandSinkRegions(state);
+            ExpandSinkRegions(state, context.Topology, context.Adjacency); // MODIFIED: Pass adjacency
 
             // -----------------------------
             // B) Pass1: Outflow + sink formation
@@ -102,7 +104,9 @@ namespace Viable.Engine
                 ref state.NextSinkId,
                 context.Tick,
                 out int boundaryHits,
-                out float maxCharge
+                out float maxCharge,
+                context.Topology,      // NEW: Pass topology
+                context.Adjacency      // NEW: Pass adjacency mode
             );
 
             // -----------------------------
@@ -180,7 +184,9 @@ namespace Viable.Engine
                 state.RegionActivationTick,
                 state.ResourceFirstTick,
                 context.Tick,
-                context.Rng,  // Deterministic!
+                context.Rng,                 // Deterministic RNG
+                context.Topology,            // NEW: Pass topology
+                context.Adjacency,           // NEW: Pass adjacency mode
                 cfg.ViabilityRule,           // Stage 13.7: Pass viability rule
                 cfg.HysteresisOnThreshold,   // Stage 13.7: Pass on threshold
                 cfg.HysteresisOffThreshold   // Stage 13.7: Pass off threshold
@@ -202,7 +208,8 @@ namespace Viable.Engine
                 state.IsSink,
                 cfg.BoundaryMode,      // Stage 13.5: Pass boundary mode
                 cfg.DiffusionMode,     // Stage 13.6: Pass diffusion mode
-                state.DomainMask       // Stage 13.8: Pass domain mask
+                state.DomainMask,      // Stage 13.8: Pass domain mask
+                context.Topology       // Stage 13.7: Pass topology
             );
 
             // Event emission could happen here (instead of Debug.Log)
@@ -212,12 +219,12 @@ namespace Viable.Engine
         /// <summary>
         /// Simple geometric expansion of sink regions (fills single-cell gaps).
         /// Extracted from SinkRegions.ExpandSinkRegions.
+        /// Stage 13.7: Updated to use topology-aware neighbor connectivity.
+        /// Stage 13.9: Updated to use adjacency mode.
         /// </summary>
-        private void ExpandSinkRegions(GridState state)
+        private void ExpandSinkRegions(GridState state, TopologyMode topology, AdjacencyMode adjacency)
         {
             bool[] nextSink = (bool[])state.IsSink.Clone();
-            int[] dx = { 0, 0, -1, 1 };
-            int[] dy = { -1, 1, 0, 0 };
 
             for (int y = 0; y < state.H; y++)
             {
@@ -227,18 +234,18 @@ namespace Viable.Engine
                     if (state.IsSink[i]) continue;
                     if (state.ActiveRegion[i]) continue; // Only expand into non-active regions
 
-                    // Check if surrounded by sinks (3+ neighbors)
-                    int sinkNeighbors = 0;
-                    for (int d = 0; d < 4; d++)
-                    {
-                        int nx = x + dx[d];
-                        int ny = y + dy[d];
-                        if (nx < 0 || nx >= state.W || ny < 0 || ny >= state.H) continue;
-                        int ni = state.Idx(nx, ny);
-                        if (state.IsSink[ni]) sinkNeighbors++;
-                    }
+                    // Check if surrounded by sinks
+                    int sinkNeighbors = NeighborProvider.CountNeighbors(
+                        x, y, state.W, state.H, topology,
+                        (nx, ny) => state.IsSink[state.Idx(nx, ny)],
+                        adjacency // ADDED: Pass adjacency mode
+                    );
 
-                    if (sinkNeighbors >= 3)
+                    // Threshold: majority of neighbors must be sinks
+                    int neighborCount = NeighborProvider.GetNeighborCount(topology, adjacency);
+                    int threshold = (neighborCount / 2) + 1; // Majority
+                    
+                    if (sinkNeighbors >= threshold)
                     {
                         nextSink[i] = true;
                         // Merge with adjacent sink using SinkLogic

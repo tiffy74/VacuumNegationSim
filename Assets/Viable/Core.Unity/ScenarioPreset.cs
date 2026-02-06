@@ -135,10 +135,13 @@ namespace Viable.Core.Unity
         [Tooltip("Viability rule (simple threshold, hysteresis)")]
         public Configuration.ViabilityRuleMode ViabilityRule = Configuration.ViabilityRuleMode.Simple;
 
-        [Tooltip("Grid topology (full domain, masked domain)")]
-        public Configuration.TopologyMode TopologyMode = Configuration.TopologyMode.FullDomain;
+        [Tooltip("Grid cell shape (rectangular, triangular, hexagonal)")]
+        public Contracts.TopologyMode GridTopology = Contracts.TopologyMode.RectGrid; // NEW: Cell tessellation
 
-        [Header("Topology Details (when MaskedDomain)")]
+        [Tooltip("Active domain shape (full grid or masked region)")]
+        public Configuration.DomainMode DomainMode = Configuration.DomainMode.FullDomain; // RENAMED: Domain masking
+
+        [Header("Domain Details (when MaskedDomain)")]
         public Configuration.MaskShape MaskShape = Configuration.MaskShape.Circle;
         public float MaskRadiusOuter = 20f;
         public float MaskRadiusInner = 10f;

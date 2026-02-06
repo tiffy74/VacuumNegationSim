@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using Viable.Contracts; // ADDED: For TopologyMode enum
 
 namespace Viable.Core.Unity.Configuration
 {
@@ -21,14 +22,15 @@ namespace Viable.Core.Unity.Configuration
         public int GridHeight = 64;
 
         [Header("Mechanism Modes")]
-        public TopologyMode Topology = TopologyMode.FullDomain;
+        public Contracts.TopologyMode GridTopology = Contracts.TopologyMode.RectGrid; // NEW: Cell shape (Rect/Tri/Hex)
+        public DomainMode Domain = DomainMode.FullDomain; // RENAMED: Active region shape
         public BoundaryMode Boundary = BoundaryMode.Wrap;
         public InflowMode Inflow = InflowMode.UniformField;
         public DiffusionMode Diffusion = DiffusionMode.Moore8;
         public ViabilityRuleMode ViabilityRule = ViabilityRuleMode.Simple;
         public string PhaseSetId = "Standard";
 
-        [Header("Topology Details (when MaskedDomain)")]
+        [Header("Domain Details (when MaskedDomain)")]
         public MaskShape MaskType = MaskShape.Circle;
         public float MaskRadiusOuter = 20f;
         public float MaskRadiusInner = 10f;
@@ -91,13 +93,17 @@ namespace Viable.Core.Unity.Configuration
             // Map mechanism modes from preset's MechanismConfig
             if (preset.MechanismConfig != null)
             {
-                config.Topology = preset.MechanismConfig.TopologyMode;
+                // NEW: Map GridTopology from preset
+                config.GridTopology = preset.MechanismConfig.GridTopology;
+                Debug.Log($"[WorkingScenarioConfig] Loaded GridTopology from preset: {config.GridTopology}");
+                
+                config.Domain = preset.MechanismConfig.DomainMode; // RENAMED
                 config.Boundary = preset.MechanismConfig.BoundaryMode;
                 config.Inflow = preset.MechanismConfig.InflowMode;
                 config.Diffusion = preset.MechanismConfig.DiffusionMode;
                 config.ViabilityRule = preset.MechanismConfig.ViabilityRule;
 
-                // Topology details
+                // Domain details
                 config.MaskType = preset.MechanismConfig.MaskShape;
                 config.MaskRadiusOuter = preset.MechanismConfig.MaskRadiusOuter;
                 config.MaskRadiusInner = preset.MechanismConfig.MaskRadiusInner;
@@ -145,16 +151,16 @@ namespace Viable.Core.Unity.Configuration
         /// </summary>
         public string GetMechanismSummary()
         {
-            return $"Topology: {Topology} · Boundary: {Boundary} · Inflow: {Inflow} · Diffusion: {Diffusion} · Viability: {ViabilityRule}";
+            return $"Grid: {GridTopology} • Domain: {Domain} • Boundary: {Boundary} • Inflow: {Inflow} • Diffusion: {Diffusion} • Viability: {ViabilityRule}";
         }
     }
 
     #region Enums
 
-    public enum TopologyMode
+    public enum DomainMode // RENAMED from TopologyMode
     {
-        FullDomain,
-        MaskedDomain
+        FullDomain,     // Entire grid is active
+        MaskedDomain    // Only cells inside mask shape are active
     }
 
     public enum BoundaryMode

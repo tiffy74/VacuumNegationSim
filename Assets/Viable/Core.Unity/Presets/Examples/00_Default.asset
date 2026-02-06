@@ -89,8 +89,9 @@ MonoBehaviour:
     BoundaryMode: 2
     DiffusionMode: 1
     ViabilityRule: 0
-    TopologyMode: 0
-    MaskShape: 1
+    GridTopology: 0
+    DomainMode: 0
+    MaskShape: 4
     MaskRadiusOuter: 20
     MaskRadiusInner: 10
     MaskCorridorWidth: 8

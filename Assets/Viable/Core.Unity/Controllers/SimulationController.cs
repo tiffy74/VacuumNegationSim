@@ -112,6 +112,16 @@ namespace Viable.Core.Unity.Controllers
 
         void Start()
         {
+            // Wait one frame to let UI orchestrator initialize first
+            StartCoroutine(DelayedInitialization());
+        }
+
+        private System.Collections.IEnumerator DelayedInitialization()
+        {
+            // Wait for orchestrator to initialize and load default preset
+            yield return null;
+            
+            // Now initialize simulation with the preset from orchestrator
             InitializeSimulation();
             
             // Don't auto-start the simulation loop
@@ -129,6 +139,16 @@ namespace Viable.Core.Unity.Controllers
             
             // Determine grid size and configuration source
             int gridWidth, gridHeight;
+            TopologyMode topology = TopologyMode.RectGrid; // ADDED: Default topology
+            
+            // MODIFIED: Try to get preset from orchestrator FIRST
+            var orchestrator = FindFirstObjectByType<Controllers.SimulationUIOrchestrator>();
+            if (orchestrator != null && orchestrator.CurrentPreset != null)
+            {
+                // Use preset from orchestrator (ensures UI sync)
+                scenarioPreset = orchestrator.CurrentPreset;
+                Debug.Log($"[SimulationController] Using preset from orchestrator: {scenarioPreset.PresetName}");
+            }
             
             if (scenarioPreset != null)
             {
@@ -155,13 +175,9 @@ namespace Viable.Core.Unity.Controllers
                 // Store scenario for export (Stage 9)
                 lastScenario = ScenarioPresetAdapter.ToScenarioDefinition(scenarioPreset);
                 
-                // Create default run request for export
-                lastRequest = new RunRequest
-                {
-                    Steps = 0, // Will be updated as simulation runs
-                    SampleEvery = 10,
-                    EmitEvents = false
-                };
+                // ADDED: Extract topology from scenario
+                topology = lastScenario.EngineConfig?.TopologyMode ?? TopologyMode.RectGrid;
+                Debug.Log($"[SimulationController] Using topology from preset: {topology}");
             }
             else
             {
@@ -193,6 +209,10 @@ namespace Viable.Core.Unity.Controllers
                     SampleEvery = 10,
                     EmitEvents = false
                 };
+                
+                // ADDED: Use default topology for legacy mode
+                topology = TopologyMode.RectGrid;
+                Debug.Log("[SimulationController] Using default topology (Rectangular) for legacy mode");
             }
 
             // Spawn visual cells (or reuse existing if same size)
@@ -200,8 +220,8 @@ namespace Viable.Core.Unity.Controllers
             {
                 // Need to respawn - size changed or first time
                 views = new CellVisualiser[gridWidth, gridHeight];
-                Grid.SpawnVisualCells(views);
-                Debug.Log($"[SimulationController] Spawned {gridWidth}×{gridHeight} visual cells");
+                Grid.SpawnVisualCells(views, topology); // MODIFIED: Pass topology
+                Debug.Log($"[SimulationController] Spawned {gridWidth}×{gridHeight} visual cells with topology: {topology}");
             }
             else
             {
@@ -216,7 +236,8 @@ namespace Viable.Core.Unity.Controllers
             float resourceGlobal = scenarioPreset != null ? scenarioPreset.InitialResourceGlobal : ResourceGlobal;
             float scaleFactor = scenarioPreset != null ? scenarioPreset.ScaleFactor : ScaleFactor;
             
-            context = new StepContext(config, resourceGlobal, scaleFactor, seed);
+            // MODIFIED: Pass topology AND adjacency mode
+            context = new StepContext(config, resourceGlobal, scaleFactor, seed, topology, config.AdjacencyMode);
 
             // Initialize state
             InitStateInto(state, context);
@@ -594,16 +615,21 @@ namespace Viable.Core.Unity.Controllers
             int x = cellIndex % state.W;
             int y = cellIndex / state.W;
 
-            int[] dx = { 0, 0, -1, 1 };
-            int[] dy = { -1, 1, 0, 0 };
+            // Get neighbor count for current topology
+            TopologyMode topology = context.Topology;
+            int neighborCount = NeighborProvider.GetNeighborCount(topology);
+            int maxConfigs = 1 << neighborCount; // 2^neighborCount (16 for rect, 64 for tri/hex)
 
-            for (int configMask = 0; configMask < 16; configMask++) // FIXED: Renamed from 'config'
+            for (int configMask = 0; configMask < maxConfigs; configMask++)
             {
                 float simulatedResource = state.ResourceLocal[cellIndex];
 
-                for (int n = 0; n < 4; n++)
+                // Iterate over neighbors using topology-aware offsets
+                NeighborProvider.GetNeighborOffsets(x, y, topology, out int[] dx, out int[] dy);
+                
+                for (int n = 0; n < neighborCount; n++)
                 {
-                    if (((configMask >> n) & 1) == 0) continue; // FIXED: Updated variable name
+                    if (((configMask >> n) & 1) == 0) continue;
 
                     int nx = x + dx[n];
                     int ny = y + dy[n];
@@ -612,10 +638,10 @@ namespace Viable.Core.Unity.Controllers
                         continue;
 
                     int neighborIdx = state.Idx(nx, ny);
-                    simulatedResource += config.PropagateFrac * state.ResourceLocal[neighborIdx] * 0.25f; // FIXED: Now works
+                    simulatedResource += config.PropagateFrac * state.ResourceLocal[neighborIdx] / (float)neighborCount;
                 }
 
-                if (simulatedResource > config.MinResourceForPersistence) // FIXED: Now works
+                if (simulatedResource > config.MinResourceForPersistence)
                     count++;
             }
 
@@ -845,18 +871,34 @@ namespace Viable.Core.Unity.Controllers
             int gridWidth = scenario.GridWidth;
             int gridHeight = scenario.GridHeight;
 
-            // Check if grid size changed
-            bool gridSizeChanged = (state != null && (state.W != gridWidth || state.H != gridHeight));
+            // ADDED: Extract topology from scenario
+            TopologyMode topology = scenario.EngineConfig?.TopologyMode ?? TopologyMode.RectGrid;
+            Debug.Log($"[SimulationController] Restarting with topology: {topology}");
 
-            if (gridSizeChanged)
+            // Check if grid size OR topology changed
+            bool gridSizeChanged = (state != null && (state.W != gridWidth || state.H != gridHeight));
+            bool topologyChanged = (context != null && context.Topology != topology);
+
+            if (gridSizeChanged || topologyChanged)
             {
-                Debug.Log($"[SimulationController] Grid size changed: {gridWidth}×{gridHeight}");
+                if (gridSizeChanged)
+                    Debug.Log($"[SimulationController] Grid size changed: {gridWidth}×{gridHeight}");
+                    
+                if (topologyChanged)
+                    Debug.Log($"[SimulationController] Topology changed: {context?.Topology} ? {topology}");
+
                 Grid.Width = gridWidth;
                 Grid.Height = gridHeight;
 
-                // Respawn visual cells
+                // Clear old visual cells before respawning
+                Debug.Log("[SimulationController] Clearing old visual cells...");
+                Grid.ClearAllCells();
+
+                // Respawn visual cells with new topology
                 views = new CellVisualiser[gridWidth, gridHeight];
-                Grid.SpawnVisualCells(views);
+                Grid.SpawnVisualCells(views, topology); // MODIFIED: Pass topology
+                
+                Debug.Log($"[SimulationController] Respawned {gridWidth}×{gridHeight} visual cells with topology: {topology}");
             }
 
             // Build SimulationConfiguration from ScenarioDefinition
@@ -870,7 +912,8 @@ namespace Viable.Core.Unity.Controllers
                 ? (float)scenario.Parameters["resourceGlobalMax"] * 0.2f // Start at 20% of max
                 : config.ResourceGlobalMax * 0.2f;
 
-            context = new StepContext(config, resourceGlobal, ScaleFactor, scenario.Seed);
+            // MODIFIED: Pass topology AND adjacency mode
+            context = new StepContext(config, resourceGlobal, ScaleFactor, scenario.Seed, topology, config.AdjacencyMode);
 
             // Initialize state
             InitStateInto(state, context);
@@ -882,14 +925,16 @@ namespace Viable.Core.Unity.Controllers
             // Create new runner
             runner = new SimulationRunner(state, phases);
 
-            // Recreate renderer if grid size changed
-            if (gridSizeChanged || gridRenderer == null)
+            // Recreate renderer if grid size changed OR topology changed
+            if (gridSizeChanged || topologyChanged || gridRenderer == null)
             {
                 gridRenderer = new Rendering.GridRenderer(
                     gridWidth, gridHeight, views,
                     InactiveColor, DormantRegionColor, ShowComplexityTint
                 );
                 gridRenderer.ViabilityColorScale = 40f;
+                
+                Debug.Log($"[SimulationController] Recreated renderer for topology: {topology}");
             }
 
             Debug.Log($"[SimulationController] Restart complete. Ready to play.");

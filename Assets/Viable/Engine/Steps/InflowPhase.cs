@@ -1,9 +1,11 @@
 using System;
+using Viable.Contracts;
 
 namespace Viable.Engine.Steps
 {
     /// <summary>
     /// Phase 2: Apply incoming resource flow, update complexity/viability/active flags, and enforce constraints.
+    /// Updated for multi-topology support (Triangle/Rectangle/Hexagon).
     /// </summary>
     public static class InflowPhase
     {
@@ -59,6 +61,7 @@ namespace Viable.Engine.Steps
         /// Apply incoming resource flow, update complexity/viability/active flags, and enforce hard constraints.
         /// Uses RNG from StepContext for deterministic perturbations.
         /// Stage 13.7: Supports hysteresis activation rule.
+        /// Updated for multi-topology support.
         /// </summary>
         public static void ApplyAndViability(
             Func<int, int, int> Idx,
@@ -76,15 +79,14 @@ namespace Viable.Engine.Steps
             int[] RegionActivationTick, int[] ResourceFirstTick,
             int tick,
             Random rng,
+            TopologyMode topology, AdjacencyMode adjacency,  // NEW: topology parameters
             Contracts.ViabilityRule viabilityRule = Contracts.ViabilityRule.HardThreshold,  // Stage 13.7
             double hysteresisOnThreshold = 0.0,  // Stage 13.7
             double hysteresisOffThreshold = 0.0)  // Stage 13.7
         {
-            // Neighbour offsets (4-way)
-            int[] dx = { 0, 0, -1, 1 };
-            int[] dy = { -1, 1, 0, 0 };
-
-            const int totalConfigs = 16; // 2^4
+            // Get total neighbor count for this topology (used for complexity calculation)
+            int neighborCount = NeighborProvider.GetNeighborCount(topology, adjacency);
+            int totalConfigs = 1 << neighborCount; // 2^neighborCount
 
             for (int y = 0; y < height; y++)
             {
@@ -153,11 +155,14 @@ namespace Viable.Engine.Steps
                     float configComplexity = MathF.Log(1 + persistenceConfigs) / MathF.Log(1 + totalConfigs);
 
                     // Part B: local gradient proxy (resource contrast with neighbours)
+                    // Use NeighborProvider for correct neighbor offsets
+                    NeighborProvider.GetNeighborOffsets(x, y, topology, out int[] dx, out int[] dy, adjacency);
+                    
                     float gradSum = 0f;
                     int gradCount = 0;
                     float rHere = ResourceLocal[i];
 
-                    for (int d = 0; d < 4; d++)
+                    for (int d = 0; d < dx.Length; d++)
                     {
                         int nx = x + dx[d];
                         int ny = y + dy[d];

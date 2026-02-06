@@ -17,7 +17,8 @@ namespace Viable.Core.Unity.UI
     public class MechanismsSection : CollapsibleSection
     {
         [Header("Mechanism Dropdowns")]
-        [SerializeField] private TMP_Dropdown topologyDropdown;
+        [SerializeField] private TMP_Dropdown gridTopologyDropdown; // NEW: Grid tessellation (Rect/Tri/Hex)
+        [SerializeField] private TMP_Dropdown domainModeDropdown;   // RENAMED: Was topologyDropdown
         [SerializeField] private TMP_Dropdown boundaryDropdown;
         [SerializeField] private TMP_Dropdown inflowDropdown;
         [SerializeField] private TMP_Dropdown diffusionDropdown;
@@ -42,14 +43,31 @@ namespace Viable.Core.Unity.UI
 
             Debug.Log("[MechanismsSection] Start() called - populating dropdowns");
 
+            // Find orchestrator if not assigned
+            if (orchestrator == null)
+            {
+                orchestrator = FindFirstObjectByType<SimulationUIOrchestrator>();
+                if (orchestrator != null)
+                {
+                    Debug.Log("[MechanismsSection] Found orchestrator");
+                }
+                else
+                {
+                    Debug.LogWarning("[MechanismsSection] Orchestrator not found!");
+                }
+            }
+
             // Populate dropdowns
             PopulateAllDropdowns();
 
             Debug.Log("[MechanismsSection] Dropdowns populated");
 
             // Wire change listeners
-            if (topologyDropdown != null)
-                topologyDropdown.onValueChanged.AddListener(_ => OnDropdownChanged());
+            if (gridTopologyDropdown != null)
+                gridTopologyDropdown.onValueChanged.AddListener(_ => OnDropdownChanged());
+
+            if (domainModeDropdown != null)
+                domainModeDropdown.onValueChanged.AddListener(_ => OnDropdownChanged());
 
             if (boundaryDropdown != null)
                 boundaryDropdown.onValueChanged.AddListener(_ => OnDropdownChanged());
@@ -78,9 +96,11 @@ namespace Viable.Core.Unity.UI
                 return;
 
             // Set dropdown values WITHOUT triggering OnValueChanged events
-            // Assuming you have these dropdowns (adjust names to match your actual fields):
-            if (topologyDropdown != null)
-                topologyDropdown.SetValueWithoutNotify((int)cfg.Topology);
+            if (gridTopologyDropdown != null)
+                gridTopologyDropdown.SetValueWithoutNotify((int)cfg.GridTopology); // NEW: Set grid tessellation
+
+            if (domainModeDropdown != null)
+                domainModeDropdown.SetValueWithoutNotify((int)cfg.Domain); // RENAMED: Set domain masking
 
             if (boundaryDropdown != null)
                 boundaryDropdown.SetValueWithoutNotify((int)cfg.Boundary);
@@ -104,7 +124,8 @@ namespace Viable.Core.Unity.UI
 
         private void PopulateAllDropdowns()
         {
-            PopulateTopologyDropdown();
+            PopulateGridTopologyDropdown(); // NEW: Populate grid tessellation dropdown
+            PopulateDomainModeDropdown();   // RENAMED: Was PopulateTopologyDropdown
             PopulateBoundaryDropdown();
             PopulateInflowDropdown();
             PopulateDiffusionDropdown();
@@ -114,26 +135,41 @@ namespace Viable.Core.Unity.UI
 
         #region Populate Dropdowns
 
-        private void PopulateTopologyDropdown()
+        private void PopulateGridTopologyDropdown()
         {
-            if (topologyDropdown == null)
+            if (gridTopologyDropdown == null)
             {
-                Debug.LogError("[MechanismsSection] topologyDropdown is NULL!");
+                Debug.LogError("[MechanismsSection] gridTopologyDropdown is NULL!");
                 return;
             }
             
-            Debug.Log($"[MechanismsSection] Populating Topology dropdown (name: {topologyDropdown.name}, current options: {topologyDropdown.options.Count})");
-            topologyDropdown.ClearOptions();
-            topologyDropdown.AddOptions(new List<string>
+            Debug.Log($"[MechanismsSection] Populating GridTopology dropdown (name: {gridTopologyDropdown.name})");
+            gridTopologyDropdown.ClearOptions();
+            gridTopologyDropdown.AddOptions(new List<string>
+            {
+                "Rectangular Grid (4-neighbor)",
+                "Triangular Grid (3 or 6-neighbor)",
+                "Hexagonal Grid (6-neighbor)"
+            });
+            Debug.Log($"[MechanismsSection] GridTopology dropdown populated with {gridTopologyDropdown.options.Count} options");
+        }
+
+        private void PopulateDomainModeDropdown()
+        {
+            if (domainModeDropdown == null)
+            {
+                Debug.LogError("[MechanismsSection] domainModeDropdown is NULL!");
+                return;
+            }
+            
+            Debug.Log($"[MechanismsSection] Populating DomainMode dropdown (name: {domainModeDropdown.name})");
+            domainModeDropdown.ClearOptions();
+            domainModeDropdown.AddOptions(new List<string>
             {
                 "Full Domain",
                 "Masked Domain"
             });
-            Debug.Log($"[MechanismsSection] Topology dropdown populated with {topologyDropdown.options.Count} options:");
-            foreach (var opt in topologyDropdown.options)
-            {
-                Debug.Log($"  - {opt.text}");
-            }
+            Debug.Log($"[MechanismsSection] DomainMode dropdown populated with {domainModeDropdown.options.Count} options");
         }
 
         private void PopulateBoundaryDropdown()
@@ -156,6 +192,7 @@ namespace Viable.Core.Unity.UI
             foreach (var opt in boundaryDropdown.options)
             {
                 Debug.Log($"  - {opt.text}");
+
             }
         }
 
@@ -258,8 +295,11 @@ namespace Viable.Core.Unity.UI
             currentConfig = config;
 
             // Set dropdown values from config
-            if (topologyDropdown != null)
-                topologyDropdown.value = (int)config.Topology;
+            if (gridTopologyDropdown != null)
+                gridTopologyDropdown.value = (int)config.GridTopology; // NEW: Set grid tessellation
+
+            if (domainModeDropdown != null)
+                domainModeDropdown.value = (int)config.Domain; // RENAMED: Set domain masking
 
             if (boundaryDropdown != null)
                 boundaryDropdown.value = (int)config.Boundary;
@@ -285,8 +325,15 @@ namespace Viable.Core.Unity.UI
         public override void ApplyEdits(Configuration.WorkingScenarioConfig config)
         {
             // Apply dropdown selections to config
-            if (topologyDropdown != null)
-                config.Topology = (Configuration.TopologyMode)topologyDropdown.value;
+            if (gridTopologyDropdown != null)
+            {
+                var selectedTopology = (Contracts.TopologyMode)gridTopologyDropdown.value;
+                Debug.Log($"[MechanismsSection] ApplyEdits: GridTopology dropdown value={gridTopologyDropdown.value} ? {selectedTopology}");
+                config.GridTopology = selectedTopology;
+            }
+
+            if (domainModeDropdown != null)
+                config.Domain = (Configuration.DomainMode)domainModeDropdown.value; // RENAMED: Apply domain masking
 
             if (boundaryDropdown != null)
                 config.Boundary = (Configuration.BoundaryMode)boundaryDropdown.value;
@@ -311,34 +358,63 @@ namespace Viable.Core.Unity.UI
 
         private void OnDropdownChanged()
         {
-            if (currentConfig != null)
+            // Apply changes to orchestrator's WorkingConfig (THE single source of truth)
+            if (orchestrator != null && orchestrator.WorkingConfig != null)
             {
-                // Apply changes immediately to working config
-                ApplyEdits(currentConfig);
+                // Apply changes immediately to orchestrator's working config
+                ApplyEdits(orchestrator.WorkingConfig);
                 UpdateMechanismSummary();
 
                 // Notify listeners (to refresh detail sections)
                 OnMechanismChanged?.Invoke();
+                
+                Debug.Log($"[MechanismsSection] Updated orchestrator WorkingConfig: GridTopology={orchestrator.WorkingConfig.GridTopology}");
+            }
+            else if (currentConfig != null)
+            {
+                // Fallback to local config if orchestrator not available
+                ApplyEdits(currentConfig);
+                UpdateMechanismSummary();
+                OnMechanismChanged?.Invoke();
+                
+                Debug.LogWarning("[MechanismsSection] Orchestrator not found, using local config (changes may not persist)");
             }
         }
 
         private void UpdateMechanismSummary()
         {
-            if (mechanismSummaryText != null && currentConfig != null)
+            // Use orchestrator's WorkingConfig (the single source of truth)
+            var config = (orchestrator != null && orchestrator.WorkingConfig != null) 
+                ? orchestrator.WorkingConfig 
+                : currentConfig;
+                
+            if (mechanismSummaryText != null && config != null)
             {
                 // Use "•" bullet separator per original design
                 mechanismSummaryText.text = 
-                    $"Topology: {GetFriendlyName(currentConfig.Topology)} • " +
-                    $"Boundary: {GetFriendlyName(currentConfig.Boundary)} • " +
-                    $"Inflow: {GetFriendlyName(currentConfig.Inflow)} • " +
-                    $"Diffusion: {GetFriendlyName(currentConfig.Diffusion)} • " +
-                    $"Viability: {GetFriendlyName(currentConfig.ViabilityRule)}";
+                    $"Grid: {GetFriendlyName(config.GridTopology)} • " + // NEW: Show grid tessellation
+                    $"Domain: {GetFriendlyName(config.Domain)} • " +
+                    $"Boundary: {GetFriendlyName(config.Boundary)} • " +
+                    $"Inflow: {GetFriendlyName(config.Inflow)} • " +
+                    $"Diffusion: {GetFriendlyName(config.Diffusion)} • " +
+                    $"Viability: {GetFriendlyName(config.ViabilityRule)}";
             }
         }
 
-        private string GetFriendlyName(Configuration.TopologyMode mode)
+        private string GetFriendlyName(Contracts.TopologyMode mode) // NEW: Grid tessellation names
         {
-            return mode == Configuration.TopologyMode.FullDomain ? "FullDomain" : "MaskedDomain";
+            switch (mode)
+            {
+                case Contracts.TopologyMode.RectGrid: return "Rectangular";
+                case Contracts.TopologyMode.TriGrid: return "Triangular";
+                case Contracts.TopologyMode.HexGrid: return "Hexagonal";
+                default: return mode.ToString();
+            }
+        }
+
+        private string GetFriendlyName(Configuration.DomainMode mode) // Domain masking names
+        {
+            return mode == Configuration.DomainMode.FullDomain ? "FullDomain" : "MaskedDomain";
         }
 
         private string GetFriendlyName(Configuration.BoundaryMode mode)
