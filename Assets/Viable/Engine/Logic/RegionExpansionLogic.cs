@@ -128,6 +128,7 @@ namespace Viable.Engine.Logic
                         // Pay resource cost
                         s.ResourceLocal[ni] = Math.Max(0f, s.ResourceLocal[ni] - regionExpansionCost);
 
+
                         // Create active region
                         nextRegion[i] = true;
 

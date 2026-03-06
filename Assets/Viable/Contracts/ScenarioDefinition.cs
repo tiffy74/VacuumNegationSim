@@ -15,7 +15,7 @@ namespace Viable.Contracts
         /// <summary>
         /// Human-readable scenario name.
         /// </summary>
-        public string ScenarioName { get; set; } = "Default Scenario";
+        public string ScenarioName { get; set; } = "Default";
 
         /// <summary>
         /// Scenario description for documentation.

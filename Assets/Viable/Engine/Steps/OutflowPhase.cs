@@ -2,6 +2,7 @@ using System;
 using Viable.Engine.State;
 using Viable.Engine.Execution;
 using Viable.Engine.Logic;
+using Viable.Engine.ExpansionModels; // Stage 14: For IExpansionModel
 using Viable.Contracts;
 
 namespace Viable.Engine.Steps
@@ -10,6 +11,7 @@ namespace Viable.Engine.Steps
     /// Phase 1: Gather outflow from active cells and distribute to neighbors.
     /// Handles sink formation at boundaries via charge accumulation.
     /// Updated for multi-topology support (Triangle/Rectangle/Hexagon).
+    /// Stage 14: Uses IExpansionModel for sink formation decisions.
     /// </summary>
     public static class OutflowPhase
     {
@@ -33,17 +35,40 @@ namespace Viable.Engine.Steps
             return hasActiveNeighbor;
         }
 
+        /// <summary>
+        /// Gather outflow from active cells and distribute to neighbors.
+        /// Stage 14: Now accepts GridState and StepContext for expansion model integration.
+        /// </summary>
         public static int GatherOutflow(
-            int width, int height,
-            float[] ResourceLocal, float[] V, byte[] Active, bool[] IsInactive, float[] incoming,
+            GridState state,
+            StepContext context,
             float MinBudgetToPropagate, float PropagateFrac,
-            bool[] ActiveRegion, bool[] IsSink, float[] SinkCharge, float sinkThreshold, float MatterAheadThreshold,
-            int[] RegionActivationTick, int[] ResourceFirstTick,
-            int[] SinkId, int[] SinkParent, float[] SinkMass, ref int NextSinkId,
-            int tick, out int boundaryHitsThisTick, out float maxChargeThisTick,
-            TopologyMode topology, AdjacencyMode adjacency,  // NEW: topology parameters
+            float sinkThreshold, float MatterAheadThreshold,
+            out int boundaryHitsThisTick, out float maxChargeThisTick,
             bool debugForceSinkOnFirstBoundaryHit = false)
         {
+            int width = state.W;
+            int height = state.H;
+            var topology = context.Topology;
+            var adjacency = context.Adjacency;
+            int tick = context.Tick;
+            var expansionModel = context.ExpansionModel;
+            
+            // Array aliases for cleaner code
+            float[] ResourceLocal = state.ResourceLocal;
+            float[] V = state.V;
+            byte[] Active = state.Active;
+            bool[] IsInactive = state.IsInactive;
+            float[] incoming = state.Incoming;
+            bool[] ActiveRegion = state.ActiveRegion;
+            bool[] IsSink = state.IsSink;
+            float[] SinkCharge = state.SinkCharge;
+            int[] RegionActivationTick = state.RegionActivationTick;
+            int[] ResourceFirstTick = state.ResourceFirstTick;
+            int[] SinkId = state.SinkId;
+            int[] SinkParent = state.SinkParent;
+            float[] SinkMass = state.SinkMass;
+            
             Array.Clear(incoming, 0, incoming.Length);
             int newSinkCount = 0;
             boundaryHitsThisTick = 0;
@@ -200,13 +225,16 @@ namespace Viable.Engine.Steps
                         }
                     }
 
-                    // PART 2: Handle boundary inactive leakage (creates sinks after tick 10)
+                    // PART 2: Handle boundary inactive leakage (creates sinks)
+                    // Stage 14: Sink formation now delegated to expansion model plugin
                     float leakPerNeighbor = available / neighborCount; // Equal split across all possible neighbors
                     for (int di = 0; di < neighborCount; di++)
                     {
                         if (!isBoundaryInactive[di]) continue;
 
                         int neighborIdx = neighborIndices[di];
+                        int nx = neighborIdx % width;
+                        int ny = neighborIdx / width;
 
                         // Resource leaking to boundary inactive charges sink formation
                         SinkCharge[neighborIdx] += leakPerNeighbor;
@@ -214,27 +242,31 @@ namespace Viable.Engine.Steps
 
                         maxChargeThisTick = Math.Max(maxChargeThisTick, SinkCharge[neighborIdx]);
 
-                        // Do NOT allow sink formation before tick 10 (prevents seed destruction)
-                        bool allowSink = tick >= 10;
+                        // Stage 14: Delegate sink formation decision to expansion model
+                        bool shouldCreate = expansionModel.ShouldFormSink(
+                            neighborIdx, nx, ny, state, context, SinkCharge[neighborIdx]);
+                        
+                        // Debug override for testing
+                        if (debugForceSinkOnFirstBoundaryHit && !shouldCreate)
+                            shouldCreate = true;
 
-                        // Require both: sufficient time elapsed AND threshold reached
-                        bool shouldCreate = allowSink && (SinkCharge[neighborIdx] >= sinkThreshold || debugForceSinkOnFirstBoundaryHit);
                         if (shouldCreate)
                         {
                             // This automatically merges with adjacent sinks via union-find
                             int sinkRoot = SinkLogic.AssignOrMergeAtCell(
                                 neighborIdx, width, height,
-                                IsSink, SinkId, SinkParent, SinkMass, ref NextSinkId);
+                                IsSink, SinkId, SinkParent, SinkMass, ref state.NextSinkId);
                             
                             SinkCharge[neighborIdx] = 0f;
                             newSinkCount++;
+                            
+                            // Stage 14: Notify expansion model of sink formation
+                            expansionModel.OnSinkFormed(neighborIdx, nx, ny, state, context);
                             
                             // Get the total mass of the (possibly merged) sink
                             float totalMass = 1f;
                             if (sinkRoot > 0 && sinkRoot < SinkMass.Length)
                                 totalMass = SinkMass[sinkRoot];
-
-                            // Event emission instead of Debug.Log (handled by caller)
 
                             if (debugForceSinkOnFirstBoundaryHit)
                                 debugForceSinkOnFirstBoundaryHit = false;

@@ -59,6 +59,12 @@ namespace Viable.Contracts
         public TopologyMode TopologyMode { get; set; } = TopologyMode.RectGrid;
 
         /// <summary>
+        /// Neighbor connectivity mode (edge-only vs edge+vertex).
+        /// Default: EdgeOnly.
+        /// </summary>
+        public AdjacencyMode AdjacencyMode { get; set; } = AdjacencyMode.EdgeOnly;
+
+        /// <summary>
         /// Mask shape when TopologyMode = MaskedDomain. Default: Rectangle (no mask).
         /// Stage 13.9: Future feature for constrained geometries.
         /// </summary>
@@ -99,6 +105,14 @@ namespace Viable.Contracts
         /// Hysteresis OFF threshold (ViabilityRule.Hysteresis). Default: 0 (uses HardThreshold).
         /// </summary>
         public double HysteresisOffThreshold { get; set; } = 0.0;
+
+        // ===== Sink Controls =====
+        public double SinkFormationThreshold { get; set; } = 0.5;
+        public double SinkDrainFraction { get; set; } = 0.0;
+        public double SinkRecoilFraction { get; set; } = 0.0;
+        public int InitialSinkCount { get; set; } = 0;
+        public double SinkSpacing { get; set; } = 10.0;
+        public double SinkRandomness { get; set; } = 0.0;
 
         // ===== Mask Parameters =====
 
@@ -155,6 +169,16 @@ namespace Viable.Contracts
         /// Actual subcells = BaseSubcells + (AlphaSubcellsPerLineage × lineageDepth).
         /// </summary>
         public double AlphaSubcellsPerLineage { get; set; } = 0.0;
+
+        // ===== Stage 14: Expansion Model Configuration =====
+
+        /// <summary>
+        /// Configuration for expansion/sink formation dynamics.
+        /// Scientists can select different models (Viability, Cosmological, Biological, etc.)
+        /// and customize parameters to study viability constraints under various expansion scenarios.
+        /// Default: DefaultViabilityBoundaryPressure model (original behavior).
+        /// </summary>
+        public ExpansionConfig ExpansionConfig { get; set; } = new ExpansionConfig();
     }
 
     /// <summary>

@@ -9,7 +9,7 @@ namespace Viable.Core.Unity.UI
 {
     /// <summary>
     /// Diffusion details section - shows when Diffusion = Anisotropic.
-    /// Allows configuration of anisotropic direction and bias.
+    /// Allows configuration of anisotropic direction, bias, and sink controls.
     /// </summary>
     public class DiffusionDetailsSection : CollapsibleSection
     {
@@ -17,6 +17,12 @@ namespace Viable.Core.Unity.UI
         [SerializeField] private TMP_Dropdown directionDropdown;
         [SerializeField] private Slider biasSlider;
         [SerializeField] private TextMeshProUGUI biasValueText;
+
+        [Header("Sink Controls")]
+        [SerializeField] private TMP_InputField sinkCountInput;
+        [SerializeField] private TMP_InputField sinkSpacingInput;
+        [SerializeField] private TMP_InputField sinkRandomnessInput;
+        [SerializeField] private TMP_InputField sinkThresholdInput;
 
         [Header("Orchestrator")]
         [SerializeField] private SimulationUIOrchestrator orchestrator;
@@ -27,16 +33,22 @@ namespace Viable.Core.Unity.UI
         {
             base.Start();
 
+            // Find orchestrator if not assigned
+            if (orchestrator == null)
+            {
+                orchestrator = FindFirstObjectByType<SimulationUIOrchestrator>();
+            }
+
             // Populate direction dropdown
             if (directionDropdown != null)
             {
                 directionDropdown.ClearOptions();
                 directionDropdown.AddOptions(new List<string>
                 {
-                    "North (?)",
-                    "East (?)",
-                    "South (?)",
-                    "West (?)"
+                    "North (↑)",
+                    "East (→)",
+                    "South (↓)",
+                    "West (←)"
                 });
                 directionDropdown.onValueChanged.AddListener(OnDirectionChanged);
             }
@@ -49,6 +61,8 @@ namespace Viable.Core.Unity.UI
                 biasSlider.value = 0.5f;
                 biasSlider.onValueChanged.AddListener(OnBiasChanged);
             }
+
+           
         }
 
         public override void Bind(Configuration.WorkingScenarioConfig config)
@@ -64,6 +78,8 @@ namespace Viable.Core.Unity.UI
                 biasSlider.value = config.AnisotropicBias;
 
             UpdateBiasValueText(config.AnisotropicBias);
+
+
         }
 
         /// <summary>
@@ -83,13 +99,15 @@ namespace Viable.Core.Unity.UI
 
             if (biasValueText != null)
                 biasValueText.text = cfg.AnisotropicBias.ToString("F2");
+
+
         }
 
         public override void RefreshVisibility(Configuration.WorkingScenarioConfig config)
         {
-            // Show only when Diffusion = Anisotropic
-            bool relevant = (config.Diffusion == Configuration.DiffusionMode.Anisotropic);
-            gameObject.SetActive(relevant);
+            // Always visible now since sink controls are here
+            // Or show only when Diffusion = Anisotropic if you prefer
+            gameObject.SetActive(true);
         }
 
         /// <summary>
@@ -104,8 +122,7 @@ namespace Viable.Core.Unity.UI
             }
             else
             {
-                // If no config bound yet, hide by default
-                gameObject.SetActive(false);
+                gameObject.SetActive(true);
             }
         }
 
@@ -118,6 +135,19 @@ namespace Viable.Core.Unity.UI
             // Apply bias
             if (biasSlider != null)
                 config.AnisotropicBias = biasSlider.value;
+
+            // Apply sink controls
+            if (sinkCountInput != null && int.TryParse(sinkCountInput.text, out var sinkCount))
+                config.InitialSinkCount = Mathf.Max(0, sinkCount);
+
+            if (sinkSpacingInput != null && float.TryParse(sinkSpacingInput.text, out var sinkSpacing))
+                config.SinkSpacing = Mathf.Max(0f, sinkSpacing);
+
+            if (sinkRandomnessInput != null && float.TryParse(sinkRandomnessInput.text, out var sinkRand))
+                config.SinkRandomness = Mathf.Clamp01(sinkRand);
+
+            if (sinkThresholdInput != null && float.TryParse(sinkThresholdInput.text, out var sinkThresh))
+                config.SinkFormationThreshold = sinkThresh;
         }
 
         private void OnDirectionChanged(int index)
@@ -143,6 +173,26 @@ namespace Viable.Core.Unity.UI
             if (biasValueText != null)
             {
                 biasValueText.text = $"Bias: {bias:F2}";
+            }
+        }
+
+        /// <summary>
+        /// Called when any sink control input changes.
+        /// Applies edits to orchestrator's WorkingConfig.
+        /// </summary>
+        private void OnSinkControlChanged()
+        {
+            if (orchestrator != null && orchestrator.WorkingConfig != null)
+            {
+                ApplyEdits(orchestrator.WorkingConfig);
+                Debug.Log($"[DiffusionDetailsSection] Sink controls updated: " +
+                          $"Count={orchestrator.WorkingConfig.InitialSinkCount}, " +
+                          $"Threshold={orchestrator.WorkingConfig.SinkFormationThreshold}");
+            }
+            else if (currentConfig != null)
+            {
+                ApplyEdits(currentConfig);
+                Debug.LogWarning("[DiffusionDetailsSection] Orchestrator not found, using local config");
             }
         }
     }

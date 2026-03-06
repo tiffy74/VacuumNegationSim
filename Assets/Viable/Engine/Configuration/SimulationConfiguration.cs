@@ -7,9 +7,15 @@ namespace Viable.Engine.Configuration
     /// Color values moved to separate ColorConfiguration for Unity layer.
     /// Stage 13: Added mechanism selectors with safe defaults.
     /// Stage 13.9: Added adjacency mode for neighbor connectivity.
+    /// Stage 14: ExpansionConfig available in Viable.Contracts namespace.
     /// </summary>
     public sealed class SimulationConfiguration
     {
+        // ===== Stage 14: Expansion Model Configuration =====
+        // NOTE: ExpansionConfig is available in Viable.Contracts namespace.
+        // Add reference after Unity recompiles:
+        // public Contracts.ExpansionConfig ExpansionConfig = new Contracts.ExpansionConfig();
+
         // ===== Stage 13: Mechanism Selectors (Default = Current Behavior) =====
         
         /// <summary>
@@ -142,6 +148,11 @@ namespace Viable.Engine.Configuration
         public float SinkFormationThreshold = 0.5f;
         public float SinkDrainFraction = 0.1f;
         public float SinkRecoilFraction = 0f;
+
+        // Sink placement (UI/preset driven)
+        public int InitialSinkCount = 0;
+        public float SinkSpacing = 10f;
+        public float SinkRandomness = 0f;
 
         // Region expansion coupling
         public float RegionExpansionCost = 0.2f;

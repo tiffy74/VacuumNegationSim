@@ -1,4 +1,4 @@
-using UnityEngine;
+ï»¿using UnityEngine;
 using System.Collections;
 using Viable.Engine;
 using Viable.Engine.State;
@@ -56,8 +56,8 @@ namespace Viable.Core.Unity.Controllers
         [SerializeField] private float ComplexityViabilityGainK = 1.0f;
 
         [Header("Propagation")]
-        [SerializeField] private float PropagateFrac = 0.25f;
-        [SerializeField] private float MinBudgetToPropagate = 0.1f;
+        [SerializeField] private float PropagateFrac = 0f;
+        [SerializeField] private float MinBudgetToPropagate = 0f;
         [SerializeField] private float ActivationCost = 0.25f;
 
         [Header("Complexity Dynamics")]
@@ -136,21 +136,45 @@ namespace Viable.Core.Unity.Controllers
         {
             // Get grid reference
             Grid = GetComponent<SimulationGrid>();
-            
+
             // Determine grid size and configuration source
             int gridWidth, gridHeight;
-            TopologyMode topology = TopologyMode.RectGrid; // ADDED: Default topology
-            
-            // MODIFIED: Try to get preset from orchestrator FIRST
-            var orchestrator = FindFirstObjectByType<Controllers.SimulationUIOrchestrator>();
-            if (orchestrator != null && orchestrator.CurrentPreset != null)
+            TopologyMode topology = TopologyMode.RectGrid;
+
+            // Check if we already have a scenario from RestartWithScenario (UI-driven)
+            // This takes priority over preset lookup to preserve UI-edited values like expansion model
+            bool hasScenarioFromUI = lastScenario?.Parameters != null && lastScenario.Parameters.Count > 0;
+
+            // Only try to get preset from orchestrator if we don't have a UI-driven scenario
+            if (!hasScenarioFromUI)
             {
-                // Use preset from orchestrator (ensures UI sync)
-                scenarioPreset = orchestrator.CurrentPreset;
-                Debug.Log($"[SimulationController] Using preset from orchestrator: {scenarioPreset.PresetName}");
+                var orchestrator = FindFirstObjectByType<Controllers.SimulationUIOrchestrator>();
+                if (orchestrator != null && orchestrator.CurrentPreset != null)
+                {
+                    scenarioPreset = orchestrator.CurrentPreset;
+                    Debug.Log($"[SimulationController] Using preset from orchestrator: {scenarioPreset.PresetName}");
+                }
             }
-            
-            if (scenarioPreset != null)
+
+            // Path 1: UI-driven scenario (from RestartWithScenario via ApplyAndRestart)
+            if (hasScenarioFromUI)
+            {
+                Debug.Log($"[SimulationController] Loading from UI scenario: {lastScenario.ScenarioId}");
+
+                gridWidth = lastScenario.GridWidth;
+                gridHeight = lastScenario.GridHeight;
+
+                // Build configuration from scenario definition
+                config = ScenarioPresetAdapter.ToSimulationConfiguration(lastScenario);
+
+                Grid.Width = gridWidth;
+                Grid.Height = gridHeight;
+
+                topology = lastScenario.EngineConfig?.TopologyMode ?? TopologyMode.RectGrid;
+                Debug.Log($"[SimulationController] Using topology from UI scenario: {topology}");
+            }
+            // Path 2: Preset-driven (from orchestrator or Inspector field)
+            else if (scenarioPreset != null)
             {
                 Debug.Log($"[SimulationController] Loading from preset: {scenarioPreset.PresetName}");
                 
@@ -167,6 +191,9 @@ namespace Viable.Core.Unity.Controllers
                     Debug.LogWarning("[SimulationController] Inspector overrides enabled - using Inspector values where set");
                     ApplyInspectorOverrides(config);
                 }
+
+                // Sync sink controls from config into controller fields
+                // ApplySinkConfigToFields(config);
                 
                 // Update Grid size (if dynamic)
                 Grid.Width = gridWidth;
@@ -189,6 +216,9 @@ namespace Viable.Core.Unity.Controllers
                 
                 // Build configuration from Inspector
                 config = BuildLegacyConfig();
+
+                // Sync sink controls from config into controller fields
+                // ApplySinkConfigToFields(config);
 
                 // Create minimal scenario definition for legacy mode
                 lastScenario = new ScenarioDefinition
@@ -221,23 +251,35 @@ namespace Viable.Core.Unity.Controllers
                 // Need to respawn - size changed or first time
                 views = new CellVisualiser[gridWidth, gridHeight];
                 Grid.SpawnVisualCells(views, topology); // MODIFIED: Pass topology
-                Debug.Log($"[SimulationController] Spawned {gridWidth}×{gridHeight} visual cells with topology: {topology}");
+                Debug.Log($"[SimulationController] Spawned {gridWidth}Ã—{gridHeight} visual cells with topology: {topology}");
             }
             else
             {
-                Debug.Log($"[SimulationController] Reusing existing {gridWidth}×{gridHeight} visual cells");
+                Debug.Log($"[SimulationController] Reusing existing {gridWidth}Ã—{gridHeight} visual cells");
             }
 
             // Create Engine state
             state = new GridState(gridWidth, gridHeight);
-            
+
             // Create Engine context
-            int? seed = scenarioPreset != null ? scenarioPreset.Seed : null;
-            float resourceGlobal = scenarioPreset != null ? scenarioPreset.InitialResourceGlobal : ResourceGlobal;
-            float scaleFactor = scenarioPreset != null ? scenarioPreset.ScaleFactor : ScaleFactor;
-            
-            // MODIFIED: Pass topology AND adjacency mode
-            context = new StepContext(config, resourceGlobal, scaleFactor, seed, topology, config.AdjacencyMode);
+            // Use StepContext.FromScenario if we have a UI-driven scenario with parameters
+            // This ensures expansion model and other parameters are properly extracted
+            if (hasScenarioFromUI)
+            {
+                // UI path: use FromScenario to extract expansion model from parameters
+                context = StepContext.FromScenario(lastScenario, config);
+                Debug.Log($"[SimulationController] Created context from UI scenario with expansion model: {context.ExpansionModel?.GetType().Name ?? "NULL"}");
+            }
+            else
+            {
+                // Preset/Legacy path: use constructor directly
+                int? seed = scenarioPreset != null ? scenarioPreset.Seed : null;
+                float resourceGlobal = scenarioPreset != null ? scenarioPreset.InitialResourceGlobal : ResourceGlobal;
+                float scaleFactor = scenarioPreset != null ? scenarioPreset.ScaleFactor : ScaleFactor;
+
+                context = new StepContext(config, resourceGlobal, scaleFactor, seed, topology, config.AdjacencyMode);
+                Debug.Log($"[SimulationController] Created context with default expansion model");
+            }
 
             // Initialize state
             InitStateInto(state, context);
@@ -300,10 +342,6 @@ namespace Viable.Core.Unity.Controllers
                 ExpansionRate = ExpansionRate,
                 MatterAheadThreshold = 0f,
 
-                SinkFormationThreshold = SinkFormationThreshold,
-                SinkDrainFraction = SinkDrainFraction,
-                SinkRecoilFraction = SinkRecoilFraction,
-
                 RegionExpansionChance = RegionExpansionChance,
                 RegionExpansionCost = RegionExpansionCost,
                 RegionExpansionMinSource = RegionExpansionMinSource,
@@ -316,9 +354,28 @@ namespace Viable.Core.Unity.Controllers
                 ComplexityViabilityGainA = ComplexityViabilityGainA,
                 ComplexityViabilityGainK = ComplexityViabilityGainK,
 
+                // Sink controls from Inspector
+                SinkFormationThreshold = SinkFormationThreshold,
+                SinkDrainFraction = SinkDrainFraction,
+                SinkRecoilFraction = SinkRecoilFraction,
+                InitialSinkCount = InitialSinkCount,
+                SinkSpacing = SinkSpacing,
+                SinkRandomness = SinkRandomness,
+
                 ShowComplexityTint = ShowComplexityTint,
                 ViabilityColorScale = 40f
             };
+        }
+
+        private void ApplySinkConfigToFields(SimulationConfiguration cfg)
+        {
+            // Sync controller fields used during init/sinks
+            SinkFormationThreshold = cfg.SinkFormationThreshold;
+            SinkDrainFraction = cfg.SinkDrainFraction;
+            SinkRecoilFraction = cfg.SinkRecoilFraction;
+            InitialSinkCount = cfg.InitialSinkCount;
+            SinkSpacing = cfg.SinkSpacing;
+            SinkRandomness = cfg.SinkRandomness;
         }
 
         /// <summary>
@@ -394,7 +451,7 @@ namespace Viable.Core.Unity.Controllers
         {
             s.Reset();
 
-            // Seed central region (5×5 block)
+            // Seed central region (5Ã—5 block)
             int cx = s.W / 2;
             int cy = s.H / 2;
 
@@ -419,10 +476,10 @@ namespace Viable.Core.Unity.Controllers
             }
 
             // Place initial sinks if configured
-            if (InitialSinkCount > 0)
-            {
-                PlaceInitialSinks(s, ctx);
-            }
+            //if (InitialSinkCount > 0)
+            //{
+            //    PlaceInitialSinks(s, ctx);
+            //}
 
             QualitySettings.vSyncCount = 0;
             Application.targetFrameRate = 120;
@@ -650,7 +707,17 @@ namespace Viable.Core.Unity.Controllers
 
         public void RestartSimulation()
         {
+            if (state == null || config == null)
+                return;
+
+            var topology = context?.Topology ?? config.TopologyMode;
+            var seed = scenarioPreset?.Seed ?? (int?)null;
+            float initialGlobal = scenarioPreset != null ? scenarioPreset.InitialResourceGlobal : ResourceGlobal;
+            float initialScale = scenarioPreset != null ? scenarioPreset.ScaleFactor : ScaleFactor;
+
+            context = new StepContext(config, initialGlobal, initialScale, seed, topology, config.AdjacencyMode);
             InitStateInto(state, context);
+            UpdateVisualsFromState(); // refresh immediately so paused view isnâ€™t stale
         }
 
         void LogDiagnostics()
@@ -827,14 +894,16 @@ namespace Viable.Core.Unity.Controllers
             Pause();
             StopAllCoroutines();
 
-            // Set new preset
+            // Set new preset and CLEAR lastScenario so InitializeSimulation uses the preset path
             scenarioPreset = preset;
+            lastScenario = null;  // Critical: prevents hasScenarioFromUI from being true
+            lastResult = null;
 
             // Reinitialize with new preset
             InitializeSimulation();
 
-            Debug.Log($"[SimulationController] ? Preset loaded: {preset.PresetName}");
-            
+            Debug.Log($"[SimulationController] âœ“ Preset loaded: {preset.PresetName}");
+
             // Resume if was running before
             if (wasRunning)
             {
@@ -847,97 +916,27 @@ namespace Viable.Core.Unity.Controllers
         /// Restart simulation with a new ScenarioDefinition and RunRequest.
         /// CRITICAL: This is the ONLY entry point for UI-driven restarts.
         /// Called by: SimulationUIOrchestrator.ApplyAndRestart()
+        /// 
+        /// DESIGN: Delegates to InitializeSimulation to ensure consistent behavior.
+        /// The scenario is stored in lastScenario and InitializeSimulation detects
+        /// it via hasScenarioFromUI check, using StepContext.FromScenario() to
+        /// properly extract expansion model and other parameters.
         /// </summary>
         public void RestartWithScenario(ScenarioDefinition scenario, RunRequest request)
         {
-            if (scenario == null)
-            {
-                Debug.LogError("[SimulationController] Cannot restart with null scenario");
-                return;
-            }
-
-            Debug.Log($"[SimulationController] RestartWithScenario: {scenario.ScenarioId}");
-
-            // Stop current simulation
-            Pause();
-            StopAllCoroutines();
-
-            // Store for export
+            // Store for export and for InitializeSimulation to detect
             lastScenario = scenario;
             lastRequest = request;
-            lastResult = null; // Reset result
+            lastResult = null;
 
-            // Update grid size if changed
-            int gridWidth = scenario.GridWidth;
-            int gridHeight = scenario.GridHeight;
+            // Clear the preset so InitializeSimulation uses lastScenario instead
+            scenarioPreset = null;
 
-            // ADDED: Extract topology from scenario
-            TopologyMode topology = scenario.EngineConfig?.TopologyMode ?? TopologyMode.RectGrid;
-            Debug.Log($"[SimulationController] Restarting with topology: {topology}");
-
-            // Check if grid size OR topology changed
-            bool gridSizeChanged = (state != null && (state.W != gridWidth || state.H != gridHeight));
-            bool topologyChanged = (context != null && context.Topology != topology);
-
-            if (gridSizeChanged || topologyChanged)
-            {
-                if (gridSizeChanged)
-                    Debug.Log($"[SimulationController] Grid size changed: {gridWidth}×{gridHeight}");
-                    
-                if (topologyChanged)
-                    Debug.Log($"[SimulationController] Topology changed: {context?.Topology} ? {topology}");
-
-                Grid.Width = gridWidth;
-                Grid.Height = gridHeight;
-
-                // Clear old visual cells before respawning
-                Debug.Log("[SimulationController] Clearing old visual cells...");
-                Grid.ClearAllCells();
-
-                // Respawn visual cells with new topology
-                views = new CellVisualiser[gridWidth, gridHeight];
-                Grid.SpawnVisualCells(views, topology); // MODIFIED: Pass topology
-                
-                Debug.Log($"[SimulationController] Respawned {gridWidth}×{gridHeight} visual cells with topology: {topology}");
-            }
-
-            // Build SimulationConfiguration from ScenarioDefinition
-            config = ScenarioPresetAdapter.ToSimulationConfiguration(scenario);
-
-            // Create new GridState
-            state = new GridState(gridWidth, gridHeight);
-
-            // Create new StepContext
-            float resourceGlobal = scenario.Parameters != null && scenario.Parameters.ContainsKey("resourceGlobalMax")
-                ? (float)scenario.Parameters["resourceGlobalMax"] * 0.2f // Start at 20% of max
-                : config.ResourceGlobalMax * 0.2f;
-
-            // MODIFIED: Pass topology AND adjacency mode
-            context = new StepContext(config, resourceGlobal, ScaleFactor, scenario.Seed, topology, config.AdjacencyMode);
-
-            // Initialize state
-            InitStateInto(state, context);
-
-            // Rebuild phase pipeline with new configuration
-            string phaseSetId = scenario.EngineConfig?.PhaseSetId ?? "default";
-            var phases = BuildPhasePipeline(phaseSetId);
-
-            // Create new runner
-            runner = new SimulationRunner(state, phases);
-
-            // Recreate renderer if grid size changed OR topology changed
-            if (gridSizeChanged || topologyChanged || gridRenderer == null)
-            {
-                gridRenderer = new Rendering.GridRenderer(
-                    gridWidth, gridHeight, views,
-                    InactiveColor, DormantRegionColor, ShowComplexityTint
-                );
-                gridRenderer.ViabilityColorScale = 40f;
-                
-                Debug.Log($"[SimulationController] Recreated renderer for topology: {topology}");
-            }
-
-            Debug.Log($"[SimulationController] Restart complete. Ready to play.");
+            // Delegate to shared initialization
+            InitializeSimulation();
+            
+            // Immediate visual refresh
+            //UpdateVisualsFromState();
         }
 
         /// <summary>

@@ -80,33 +80,25 @@ namespace Viable.Engine
                 cfg.RegionSeedResource
             );
 
-            // Sink expansion (simple geometric growth)
-            ExpandSinkRegions(state, context.Topology, context.Adjacency); // MODIFIED: Pass adjacency
+            // Stage 14: Notify expansion model of tick start
+            context.ExpansionModel.OnTickStart(state, context);
+
+            // Sink expansion (geometric growth - now uses expansion model)
+            ExpandSinkRegions(state, context);
 
             // -----------------------------
             // B) Pass1: Outflow + sink formation
             // -----------------------------
+            // Stage 14: Simplified call - state and context contain everything needed
             int newSinks = OutflowPhase.GatherOutflow(
-                state.W, state.H,
-                state.ResourceLocal, state.V, state.Active, state.IsInactive, state.Incoming,
+                state,
+                context,
                 cfg.MinBudgetToPropagate,
                 cfg.PropagateFrac,
-                state.ActiveRegion,
-                state.IsSink,
-                state.SinkCharge,
                 cfg.SinkFormationThreshold,
                 cfg.MatterAheadThreshold,
-                state.RegionActivationTick,
-                state.ResourceFirstTick,
-                state.SinkId,
-                state.SinkParent,
-                state.SinkMass,
-                ref state.NextSinkId,
-                context.Tick,
                 out int boundaryHits,
-                out float maxCharge,
-                context.Topology,      // NEW: Pass topology
-                context.Adjacency      // NEW: Pass adjacency mode
+                out float maxCharge
             );
 
             // -----------------------------
@@ -212,18 +204,22 @@ namespace Viable.Engine
                 context.Topology       // Stage 13.7: Pass topology
             );
 
-            // Event emission could happen here (instead of Debug.Log)
-            // e.g., context.EmitEvent(new SimulationEvent { Type = "SinkFormed", ... });
+            // Stage 14: Notify expansion model of tick end
+            context.ExpansionModel.OnTickEnd(state, context);
         }
 
         /// <summary>
-        /// Simple geometric expansion of sink regions (fills single-cell gaps).
-        /// Extracted from SinkRegions.ExpandSinkRegions.
+        /// Geometric expansion of sink regions (fills gaps based on neighbor count).
         /// Stage 13.7: Updated to use topology-aware neighbor connectivity.
         /// Stage 13.9: Updated to use adjacency mode.
+        /// Stage 14: Now uses IExpansionModel.ShouldExpandSink() for decisions.
         /// </summary>
-        private void ExpandSinkRegions(GridState state, TopologyMode topology, AdjacencyMode adjacency)
+        private void ExpandSinkRegions(GridState state, StepContext context)
         {
+            var topology = context.Topology;
+            var adjacency = context.Adjacency;
+            var expansionModel = context.ExpansionModel;
+            
             bool[] nextSink = (bool[])state.IsSink.Clone();
 
             for (int y = 0; y < state.H; y++)
@@ -238,18 +234,23 @@ namespace Viable.Engine
                     int sinkNeighbors = NeighborProvider.CountNeighbors(
                         x, y, state.W, state.H, topology,
                         (nx, ny) => state.IsSink[state.Idx(nx, ny)],
-                        adjacency // ADDED: Pass adjacency mode
+                        adjacency
                     );
 
-                    // Threshold: majority of neighbors must be sinks
                     int neighborCount = NeighborProvider.GetNeighborCount(topology, adjacency);
-                    int threshold = (neighborCount / 2) + 1; // Majority
                     
-                    if (sinkNeighbors >= threshold)
+                    // Stage 14: Delegate expansion decision to expansion model
+                    bool shouldExpand = expansionModel.ShouldExpandSink(
+                        i, x, y, state, context, sinkNeighbors, neighborCount);
+                    
+                    if (shouldExpand)
                     {
                         nextSink[i] = true;
                         // Merge with adjacent sink using SinkLogic
                         SinkLogic.AssignOrMergeAtCell(i, state.W, state.H, nextSink, state.SinkId, state.SinkParent, state.SinkMass, ref state.NextSinkId);
+                        
+                        // Stage 14: Notify expansion model
+                        expansionModel.OnSinkFormed(i, x, y, state, context);
                     }
                 }
             }

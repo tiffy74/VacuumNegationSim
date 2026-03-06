@@ -53,6 +53,7 @@ Canvas/
 3. Set placeholder text: `"Select Preset..."`
 4. Template position: Below
 5. **Min Height:** `30`
+6. **Items auto-populated** (topology/adjacency handled in MechanismsSection)
 
 ### **Add Load Button:**
 1. Right-click `PresetControlsSection` ? UI ? Button - TextMeshPro
@@ -206,7 +207,12 @@ If you want to **disable** the old TopBar preset controls:
 ?  [        Load Preset        ]  ? ? Button
 ???????????????????????????????????
 ?  MECHANISMS                     ?
-?  Grid Topology:  RectGrid    ?  ?
+?  Grid Topology:  Rect (edges)?
+?                  Rect (edges+vertices)
+?                  Tri (edges)
+?                  Tri (edges+vertices)
+?                  Hex (edges)
+?                  Hex (edges+vertices)
 ?  Inflow:         Uniform     ?  ?
 ?  Boundary:       Absorbing   ?  ?
 ?  Diffusion:      VonNeumann4 ?  ?

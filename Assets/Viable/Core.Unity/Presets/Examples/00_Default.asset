@@ -90,6 +90,7 @@ MonoBehaviour:
     DiffusionMode: 1
     ViabilityRule: 0
     GridTopology: 0
+    AdjacencyMode: 0
     DomainMode: 0
     MaskShape: 4
     MaskRadiusOuter: 20
@@ -99,6 +100,12 @@ MonoBehaviour:
     PointSources: []
     HysteresisOnThreshold: 0.5
     HysteresisOffThreshold: -0.5
+    SinkFormationThreshold: 0.5
+    SinkDrainFraction: 0
+    SinkRecoilFraction: 0
+    InitialSinkCount: 0
+    SinkSpacing: 10
+    SinkRandomness: 0
     AnisotropicDirection: 0
     AnisotropicBias: 0.7
   InactiveColor: {r: 0.034790743, g: 0.030793853, b: 0.03773582, a: 1}

@@ -33,10 +33,18 @@ namespace Viable.Core.Unity
                 scenario.EngineConfig = new EngineConfig
                 {
                     TopologyMode = preset.MechanismConfig.GridTopology, // NEW: Cell shape (Rect/Tri/Hex)
+                    AdjacencyMode = preset.MechanismConfig.AdjacencyMode, // NEW: Edge-only vs edge+vertex
                     InflowMode = MapInflowMode(preset.MechanismConfig.InflowMode),
                     BoundaryMode = MapBoundaryMode(preset.MechanismConfig.BoundaryMode),
                     DiffusionMode = MapDiffusionMode(preset.MechanismConfig.DiffusionMode),
                     ViabilityRule = MapViabilityRule(preset.MechanismConfig.ViabilityRule),
+                    // Sink controls
+                    SinkFormationThreshold = preset.MechanismConfig.SinkFormationThreshold,
+                    SinkDrainFraction = preset.MechanismConfig.SinkDrainFraction,
+                    SinkRecoilFraction = preset.MechanismConfig.SinkRecoilFraction,
+                    InitialSinkCount = preset.MechanismConfig.InitialSinkCount,
+                    SinkSpacing = preset.MechanismConfig.SinkSpacing,
+                    SinkRandomness = preset.MechanismConfig.SinkRandomness,
                     
                     // Domain masking configuration
                     MaskShape = MapMaskShape(preset.MechanismConfig.DomainMode, preset.MechanismConfig.MaskShape),
@@ -145,6 +153,13 @@ namespace Viable.Core.Unity
         {
             var config = new SimulationConfiguration();
 
+            // Map topology/adjacency from preset mechanism config if present
+            if (preset.MechanismConfig != null)
+            {
+                config.TopologyMode = preset.MechanismConfig.GridTopology;
+                config.AdjacencyMode = preset.MechanismConfig.AdjacencyMode;
+            }
+
             // Map parameters to configuration fields
             // Using helper to get parameter with default fallback
             config.ResourceGlobalMax = (float)preset.GetParameter("resourceGlobalMax", 5e7);
@@ -181,6 +196,17 @@ namespace Viable.Core.Unity
             config.RegionExpansionSeedsResource = preset.GetParameter("regionExpansionSeedsResource", 1) > 0.5;
             config.RegionSeedResource = (float)preset.GetParameter("regionSeedResource", 0.1);
 
+            // Sink controls
+            if (preset.MechanismConfig != null)
+            {
+                config.SinkFormationThreshold = preset.MechanismConfig.SinkFormationThreshold;
+                config.SinkDrainFraction = preset.MechanismConfig.SinkDrainFraction;
+                config.SinkRecoilFraction = preset.MechanismConfig.SinkRecoilFraction;
+                config.InitialSinkCount = preset.MechanismConfig.InitialSinkCount;
+                config.SinkSpacing = preset.MechanismConfig.SinkSpacing;
+                config.SinkRandomness = preset.MechanismConfig.SinkRandomness;
+            }
+
             config.ComplexityGainFromGradient = (float)preset.GetParameter("complexityGainFromGradient", 0.02);
             config.ComplexityGainNearSink = (float)preset.GetParameter("complexityGainNearSink", 0.05);
             config.ComplexityViabilityGainA = (float)preset.GetParameter("complexityViabilityGainA", 0.5);
@@ -209,7 +235,16 @@ namespace Viable.Core.Unity
                 config.DiffusionMode = scenario.EngineConfig.DiffusionMode;
                 config.ViabilityRule = scenario.EngineConfig.ViabilityRule;
                 config.TopologyMode = scenario.EngineConfig.TopologyMode;
+                config.AdjacencyMode = scenario.EngineConfig.AdjacencyMode;
                 config.MaskShape = scenario.EngineConfig.MaskShape;
+
+                // Sink controls
+                config.SinkFormationThreshold = (float)scenario.EngineConfig.SinkFormationThreshold;
+                config.SinkDrainFraction = (float)scenario.EngineConfig.SinkDrainFraction;
+                config.SinkRecoilFraction = (float)scenario.EngineConfig.SinkRecoilFraction;
+                config.InitialSinkCount = scenario.EngineConfig.InitialSinkCount;
+                config.SinkSpacing = (float)scenario.EngineConfig.SinkSpacing;
+                config.SinkRandomness = (float)scenario.EngineConfig.SinkRandomness;
 
                 config.HysteresisOnThreshold = scenario.EngineConfig.HysteresisOnThreshold;
                 config.HysteresisOffThreshold = scenario.EngineConfig.HysteresisOffThreshold;

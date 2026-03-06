@@ -21,9 +21,38 @@ namespace Viable.Core.Unity.Configuration
         public int GridWidth = 64;
         public int GridHeight = 64;
 
+        [Header("Expansion Model")]
+        [Tooltip("Expansion model type (stored as int to avoid assembly type conflicts)")]
+        public int ExpansionModelTypeInt = 0; // 0 = DefaultViabilityBoundaryPressure
+        
+        /// <summary>
+        /// Get the expansion model type as the enum value.
+        /// Uses int storage to avoid Unity assembly type conflicts.
+        /// </summary>
+        public Contracts.ExpansionModel ExpansionModelType
+        {
+            get => (Contracts.ExpansionModel)ExpansionModelTypeInt;
+            set => ExpansionModelTypeInt = (int)value;
+
+        }
+        [Header("Scenario Preset")]
+        [Tooltip("Pre-Configured Parameters to match defined scenarios)")]
+        public int ScenarioPresetInt = 0; // 0 = Default
+
+        /// <summary>
+        /// Get the Scenario preset type as the enum value.
+        /// Uses int storage to avoid Unity assembly type conflicts.
+        /// </summary>
+        public ScenarioPresetType ScenarioPresetSelection
+        {
+            get => (ScenarioPresetType)ScenarioPresetInt;
+            set => ScenarioPresetInt = (int)value;
+        }
+
         [Header("Mechanism Modes")]
-        public Contracts.TopologyMode GridTopology = Contracts.TopologyMode.RectGrid; // NEW: Cell shape (Rect/Tri/Hex)
-        public DomainMode Domain = DomainMode.FullDomain; // RENAMED: Active region shape
+        public Contracts.TopologyMode GridTopology = Contracts.TopologyMode.RectGrid; // Cell shape (Rect/Tri/Hex)
+        public AdjacencyMode Adjacency = AdjacencyMode.EdgeOnly; // Neighbor connectivity (edge vs edge+vertex)
+        public DomainMode Domain = DomainMode.FullDomain; // Active region shape
         public BoundaryMode Boundary = BoundaryMode.Wrap;
         public InflowMode Inflow = InflowMode.UniformField;
         public DiffusionMode Diffusion = DiffusionMode.Moore8;
@@ -48,8 +77,20 @@ namespace Viable.Core.Unity.Configuration
         public float HysteresisOnThreshold = 0.5f;
         public float HysteresisOffThreshold = -0.5f;
 
+        [Header("Sink Controls")]
+        public double SinkFormationThreshold = 0.5;
+        public double SinkDrainFraction = 0.0;
+        public double SinkRecoilFraction = 0.0;
+
+        [Header("Sink Placement")]
+        public int InitialSinkCount = 0;
+        public float SinkSpacing = 10f;
+        [Range(0f, 1f)] public float SinkRandomness = 0f;
+
         [Header("Core Parameters (Curated)")]
         public double ResourceGlobalMax = 5e7;
+        public double InitialResourceGlobal = 1e7f;
+        public double ScaleFactor = 1.0;  // Scale factor for simulation dynamics
         public double ResourceRechargeRate = 1e6;
         public double DecayLoss = 0.003;
         public double MaintCost = 1.0;
@@ -95,6 +136,7 @@ namespace Viable.Core.Unity.Configuration
             {
                 // NEW: Map GridTopology from preset
                 config.GridTopology = preset.MechanismConfig.GridTopology;
+                config.Adjacency = preset.MechanismConfig.AdjacencyMode;
                 Debug.Log($"[WorkingScenarioConfig] Loaded GridTopology from preset: {config.GridTopology}");
                 
                 config.Domain = preset.MechanismConfig.DomainMode; // RENAMED
@@ -102,6 +144,14 @@ namespace Viable.Core.Unity.Configuration
                 config.Inflow = preset.MechanismConfig.InflowMode;
                 config.Diffusion = preset.MechanismConfig.DiffusionMode;
                 config.ViabilityRule = preset.MechanismConfig.ViabilityRule;
+
+                // Sink controls
+                config.SinkFormationThreshold = preset.MechanismConfig.SinkFormationThreshold;
+                config.SinkDrainFraction = preset.MechanismConfig.SinkDrainFraction;
+                config.SinkRecoilFraction = preset.MechanismConfig.SinkRecoilFraction;
+                config.InitialSinkCount = preset.MechanismConfig.InitialSinkCount;
+                config.SinkSpacing = preset.MechanismConfig.SinkSpacing;
+                config.SinkRandomness = preset.MechanismConfig.SinkRandomness;
 
                 // Domain details
                 config.MaskType = preset.MechanismConfig.MaskShape;
@@ -128,6 +178,8 @@ namespace Viable.Core.Unity.Configuration
 
             // Map core parameters using GetParameter method
             config.ResourceGlobalMax = preset.GetParameter("resourceGlobalMax", 5e7);
+            config.InitialResourceGlobal = preset.InitialResourceGlobal; // CRITICAL: Copy from preset
+            config.ScaleFactor = preset.ScaleFactor; // Copy scale factor from preset
             config.ResourceRechargeRate = preset.GetParameter("globalReplenishPerTick", 200);
             config.DecayLoss = preset.GetParameter("decayLoss", 0.003);
             config.MaintCost = preset.GetParameter("ethreshBase", 0.18); // Using ethreshBase as maintCost proxy
@@ -156,6 +208,16 @@ namespace Viable.Core.Unity.Configuration
     }
 
     #region Enums
+
+    /// <summary>
+    /// Available scenario preset types for quick configuration.
+    /// </summary>
+    public enum ScenarioPresetType
+    {
+        Default = 0,
+        ViabilityBoundaryPressure = 1,
+        // Add additional preset types as needed
+    }
 
     public enum DomainMode // RENAMED from TopologyMode
     {

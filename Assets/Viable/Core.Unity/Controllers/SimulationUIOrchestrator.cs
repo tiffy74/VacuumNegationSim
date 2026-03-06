@@ -200,20 +200,33 @@ namespace Viable.Core.Unity.Controllers
                 return;
             }
 
-            // Build ScenarioDefinition from WorkingConfig
+            // CRITICAL FIX: For the default expansion model, use the preset path
+            // This avoids the conversion issues between ScenarioPreset and ScenarioDefinition
+            // that cause different simulation behavior
+            if (WorkingConfig.ExpansionModelTypeInt == 0 && CurrentPreset != null) // DefaultViabilityBoundaryPressure
+            {
+                Debug.Log($"[SimulationUIOrchestrator] Using direct preset path for default expansion model");
+                simulationController.LoadPreset(CurrentPreset);
+                return;
+            }
+
+            // For non-default expansion models, use the full scenario conversion path
             var scenario = BuildScenarioDefinition();
-            
+
             // Build RunRequest from WorkingConfig
             var request = BuildRunRequest();
-            
-            // Log for diagnostics
+
+            // Log for diagnostics (include adjacency and key params)
             Debug.Log($"[SimulationUIOrchestrator] Apply & Restart: " +
                      $"GridTopology={scenario.EngineConfig.TopologyMode}, " +
+                     $"Adjacency={scenario.EngineConfig.AdjacencyMode}, " +
                      $"InflowMode={scenario.EngineConfig.InflowMode}, " +
                      $"BoundaryMode={scenario.EngineConfig.BoundaryMode}, " +
                      $"DiffusionMode={scenario.EngineConfig.DiffusionMode}, " +
                      $"ViabilityRule={scenario.EngineConfig.ViabilityRule}, " +
-                     $"Seed={scenario.Seed}");
+                     $"Seed={scenario.Seed}, " +
+                     $"ExpansionModel={WorkingConfig.ExpansionModelTypeInt}, " +
+                     $"PhaseSet={WorkingConfig.PhaseSetId}");
 
             // Restart simulation with new configuration
             simulationController.RestartWithScenario(scenario, request);
@@ -282,8 +295,9 @@ namespace Viable.Core.Unity.Controllers
         {
             var engineConfig = new EngineConfig
             {
-                // Grid topology (cell shape) - NEW: Add this field
-                TopologyMode = WorkingConfig.GridTopology, // NEW: Directly map from GridTopology (Contracts.TopologyMode)
+                // Grid topology (cell shape)
+                TopologyMode = WorkingConfig.GridTopology,
+                AdjacencyMode = WorkingConfig.Adjacency,
                 
                 // Mechanism modes - convert from WorkingConfig enums to Contracts enums
                 InflowMode = MapInflowMode(WorkingConfig.Inflow),
@@ -308,6 +322,14 @@ namespace Viable.Core.Unity.Controllers
                 HysteresisOnThreshold = WorkingConfig.HysteresisOnThreshold,
                 HysteresisOffThreshold = WorkingConfig.HysteresisOffThreshold,
 
+                // Sink controls
+                SinkFormationThreshold = WorkingConfig.SinkFormationThreshold,
+                SinkDrainFraction = WorkingConfig.SinkDrainFraction,
+                SinkRecoilFraction = WorkingConfig.SinkRecoilFraction,
+                InitialSinkCount = WorkingConfig.InitialSinkCount,
+                SinkSpacing = WorkingConfig.SinkSpacing,
+                SinkRandomness = WorkingConfig.SinkRandomness,
+
                 // Anisotropic diffusion
                 AnisotropyDirectionX = MapAnisotropyDirectionX(WorkingConfig.AnisotropicDirection),
                 AnisotropyDirectionY = MapAnisotropyDirectionY(WorkingConfig.AnisotropicDirection),
@@ -319,23 +341,74 @@ namespace Viable.Core.Unity.Controllers
                 CorridorWidth = WorkingConfig.MaskCorridorWidth,
                 HoleProbability = WorkingConfig.MaskPercolationProbability
             };
-
+            
+            // Stage 14: Set expansion model type
+            // NOTE: Due to Unity assembly type resolution, we pass the model type
+            // as a parameter and let StepContext create the expansion model
+            // engineConfig.ExpansionConfig is created with default values
+            // and StepContext.FromScenario will use the Parameters dictionary
+            
             var parameters = new Dictionary<string, double>
             {
+                // Core resource parameters
                 ["resourceGlobalMax"] = WorkingConfig.ResourceGlobalMax,
+                ["resourceGlobal"] = WorkingConfig.InitialResourceGlobal,
+                ["scaleFactor"] = WorkingConfig.ScaleFactor,
                 ["resourceRechargeRate"] = WorkingConfig.ResourceRechargeRate,
+
+                // Expansion model
+                ["expansionModelType"] = WorkingConfig.ExpansionModelTypeInt,
+
+                // Pass ALL parameters that ToSimulationConfiguration expects
+                // These come from AdvancedParams (copied from preset) or use WorkingConfig fields
+                ["globalReplenishPerTick"] = WorkingConfig.ResourceRechargeRate,
+                ["minResourceForPersistence"] = GetAdvancedParam("minResourceForPersistence", 5),
+
+                ["ethreshBase"] = WorkingConfig.MaintCost,
+                ["globalScarcityK"] = GetAdvancedParam("globalScarcityK", 0.3),
+                ["complexityPenalty"] = GetAdvancedParam("complexityPenalty", 0.02),
                 ["decayLoss"] = WorkingConfig.DecayLoss,
-                ["maintCost"] = WorkingConfig.MaintCost,
+
+                ["propagateFrac"] = GetAdvancedParam("propagateFrac", 0),
+                ["minBudgetToPropagate"] = GetAdvancedParam("minBudgetToPropagate", 0),
                 ["activationCost"] = WorkingConfig.ActivationCost,
-                ["expansionProbability"] = WorkingConfig.ExpansionProbability,
+
+                ["complexityGainPerUse"] = GetAdvancedParam("complexityGainPerUse", 0.2),
+                ["complexityDiffusionRate"] = WorkingConfig.DiffusionRate,
+                ["complexityDecay"] = GetAdvancedParam("complexityDecay", 0.02),
+
+                ["resourceLocalMax"] = GetAdvancedParam("resourceLocalMax", 5e4),
+                ["perturbationProbability"] = GetAdvancedParam("perturbationProbability", 0.0002),
+                ["perturbationComplexity"] = GetAdvancedParam("perturbationComplexity", 0.5),
+                ["expansionRate"] = GetAdvancedParam("expansionRate", 1.0),
+                ["matterAheadThreshold"] = GetAdvancedParam("matterAheadThreshold", 0),
+
+                ["sinkFormationThreshold"] = WorkingConfig.SinkFormationThreshold,
+                ["sinkDrainFraction"] = WorkingConfig.SinkDrainFraction,
+                ["sinkRecoilFraction"] = WorkingConfig.SinkRecoilFraction,
+
+                ["regionExpansionChance"] = WorkingConfig.ExpansionProbability,
+                ["regionExpansionCost"] = GetAdvancedParam("regionExpansionCost", 0.05),
+                ["regionExpansionMinSource"] = GetAdvancedParam("regionExpansionMinSource", 0.1),
+                ["regionExpansionRequiresViability"] = GetAdvancedParam("regionExpansionRequiresViability", 0),
+                ["regionExpansionSeedsResource"] = GetAdvancedParam("regionExpansionSeedsResource", 1),
+                ["regionSeedResource"] = GetAdvancedParam("regionSeedResource", 0.1),
+
+                ["complexityGainFromGradient"] = GetAdvancedParam("complexityGainFromGradient", 0.02),
+                ["complexityGainNearSink"] = GetAdvancedParam("complexityGainNearSink", 0.05),
+                ["complexityViabilityGainA"] = GetAdvancedParam("complexityViabilityGainA", 0.5),
+                ["complexityViabilityGainK"] = GetAdvancedParam("complexityViabilityGainK", 1.0),
+
                 ["inflowPerCell"] = WorkingConfig.InflowPerCell,
-                ["diffusionRate"] = WorkingConfig.DiffusionRate
+                ["diffusionRate"] = WorkingConfig.DiffusionRate,
+                ["maintCost"] = WorkingConfig.MaintCost
             };
 
-            // Merge advanced parameters
+            // Merge any additional advanced parameters (don't overwrite existing)
             foreach (var kvp in WorkingConfig.AdvancedParams)
             {
-                parameters[kvp.Key] = kvp.Value;
+                if (!parameters.ContainsKey(kvp.Key))
+                    parameters[kvp.Key] = kvp.Value;
             }
 
             return new ScenarioDefinition
@@ -362,6 +435,17 @@ namespace Viable.Core.Unity.Controllers
                 SampleEvery = 10,
                 EmitEvents = false
             };
+        }
+
+        /// <summary>
+        /// Helper to get a parameter from WorkingConfig.AdvancedParams with fallback default.
+        /// This ensures parameters copied from preset are passed through to ScenarioDefinition.
+        /// </summary>
+        private double GetAdvancedParam(string key, double defaultValue)
+        {
+            if (WorkingConfig?.AdvancedParams != null && WorkingConfig.AdvancedParams.TryGetValue(key, out double value))
+                return value;
+            return defaultValue;
         }
 
         #region Enum Mapping Methods
@@ -496,6 +580,16 @@ namespace Viable.Core.Unity.Controllers
         public bool IsRefreshing()
         {
             return _isRefreshing;
+        }
+
+        /// <summary>
+        /// Check if there are pending UI changes (for optimization)
+        /// </summary>
+        private bool HasUIPendingChanges()
+        {
+            // TODO: Implement logic to check for pending UI changes
+            // This is a placeholder for optimization - always returns false
+            return false;
         }
     }
 }

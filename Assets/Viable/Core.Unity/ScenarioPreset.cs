@@ -138,6 +138,9 @@ namespace Viable.Core.Unity
         [Tooltip("Grid cell shape (rectangular, triangular, hexagonal)")]
         public Contracts.TopologyMode GridTopology = Contracts.TopologyMode.RectGrid; // NEW: Cell tessellation
 
+        [Tooltip("Neighbor connectivity (edge-only vs edge+vertex)")]
+        public Contracts.AdjacencyMode AdjacencyMode = Contracts.AdjacencyMode.EdgeOnly; // NEW: Connectivity mode
+
         [Tooltip("Active domain shape (full grid or masked region)")]
         public Configuration.DomainMode DomainMode = Configuration.DomainMode.FullDomain; // RENAMED: Domain masking
 
@@ -154,6 +157,16 @@ namespace Viable.Core.Unity
         [Header("Hysteresis (when ViabilityRule = Hysteresis)")]
         public float HysteresisOnThreshold = 0.5f;
         public float HysteresisOffThreshold = -0.5f;
+
+        [Header("Sink Controls")]
+        public float SinkFormationThreshold = 0.5f;
+        public float SinkDrainFraction = 0.0f;
+        public float SinkRecoilFraction = 0.0f;
+
+        [Header("Sink Placement")]
+        public int InitialSinkCount = 0;
+        public float SinkSpacing = 10f;
+        [Range(0f, 1f)] public float SinkRandomness = 0f;
 
         [Header("Anisotropic Diffusion (when DiffusionMode = Anisotropic)")]
         public Configuration.DiffusionDirection AnisotropicDirection = Configuration.DiffusionDirection.North;
